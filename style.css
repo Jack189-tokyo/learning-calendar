@@ -400,3 +400,39 @@ button {
         transform: translate(-50%, -40%);
     }
 }
+
+/* 响应式优化：小屏幕下调整布局 */
+@media (max-width: 768px) {
+    /* 输入区从三列改为两列 */
+    .entry-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    /* 输入区在超小屏幕下改为一列 */
+    .entry-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* 日历格子更紧凑 */
+    .calendar-grid {
+        gap: 4px;
+    }
+
+    .day-cell {
+        font-size: 10px;
+    }
+
+    /* 错题本日期按钮缩小 */
+    .wrong-date-btn {
+        padding: 4px 6px;
+        font-size: 11px;
+    }
+
+    /* 荣誉墙奖牌缩小 */
+    .honor-item {
+        font-size: 12px;
+        padding: 4px 6px;
+    }
+}
