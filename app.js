@@ -159,16 +159,30 @@ function saveDayData() {
 
     renderCalendarGrid();
     renderBarForSelectedDay();
+
+    // 奖牌判定
+    checkMedalForDay();
 }
 function clearDayData() {
+    // 删除当天学习数据
     const hist = getHistory();
     delete hist[selectedDateISO];
     setHistory(hist);
+
+    // 清空输入框
     document.getElementById("mathInput").value = "";
     document.getElementById("readingInput").value = "";
     document.getElementById("spellingInput").value = "";
+
+    // 更新日历和柱状图
     renderCalendarGrid();
     renderBarForSelectedDay();
+
+    // 删除当天奖牌
+    let honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
+    honor = honor.filter(item => item.date !== selectedDateISO);
+    localStorage.setItem("honorWall", JSON.stringify(honor));
+    renderHonorWall();
 }
 
 // ===== 柱状图 =====
@@ -315,6 +329,52 @@ function gotoWrongToday() {
     }
 }
 
+// ===== 成就系统（奖牌判定 + 荣誉墙） =====
+function checkMedalForDay() {
+    const hist = getHistory();
+    const day = hist[selectedDateISO] || {};
+    const scores = [day.math, day.reading, day.spelling].filter(v => typeof v === "number");
+    const count90 = scores.filter(v => v >= 90).length;
+
+    let medal = null;
+    if (count90 === 3) medal = "🥇 金牌";
+    else if (count90 === 2) medal = "🥈 银牌";
+    else if (count90 === 1) medal = "🥉 铜牌";
+
+    if (medal) {
+        showMedalPopup(medal);
+        addMedalToHonorWall(selectedDateISO, medal);
+    }
+}
+
+function showMedalPopup(medalText) {
+    const popup = document.getElementById("medalPopup");
+    popup.textContent = medalText;
+    popup.style.display = "block";
+    setTimeout(() => {
+        popup.style.display = "none";
+    }, 3000);
+}
+
+function addMedalToHonorWall(date, medalText) {
+    const honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
+    honor.push({ date, medal: medalText });
+    localStorage.setItem("honorWall", JSON.stringify(honor));
+    renderHonorWall();
+}
+
+function renderHonorWall() {
+    const honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
+    const wall = document.getElementById("honorWall");
+    wall.innerHTML = "";
+    honor.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "honor-item";
+        div.textContent = `${item.date} ${item.medal}`;
+        wall.appendChild(div);
+    });
+}
+
 // ===== 导出 CSV =====
 function exportToCSV() {
     const hist = getHistory();
@@ -397,6 +457,9 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("wrongNextBtn").addEventListener("click", gotoWrongNext);
     document.getElementById("wrongTodayBtn").addEventListener("click", gotoWrongToday);
     renderWrongCalendar();
+
+    // 荣誉墙初始化
+    renderHonorWall();
 
     // 导出 CSV
     document.getElementById("exportCsvBtn").addEventListener("click", exportToCSV);

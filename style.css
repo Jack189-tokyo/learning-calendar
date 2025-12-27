@@ -341,11 +341,62 @@ button {
             background: #4b5563;
         }
 
-/* 导出区 */
-.export-section {
+/* 荣誉墙 */
+.honor-section {
     background: #fff;
     border-radius: 10px;
     padding: 16px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.06);
     margin-top: 20px;
+}
+
+.honor-wall {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.honor-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    font-size: 14px;
+}
+
+/* 奖牌浮现动画 */
+.medal-popup {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    display: none;
+    z-index: 9999;
+    animation: fadeInOut 3s ease forwards;
+}
+
+/* 动画关键帧 */
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+
+    80% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -40%);
+    }
 }
