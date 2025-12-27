@@ -8,38 +8,103 @@
 </head>
 <body>
     <div class="container">
-        <h1>学习成长记录</h1>
+        <header class="header">
+            <h1>学习成长记录</h1>
+            <div class="controls-row">
+                <div class="month-nav">
+                    <button id="prevMonthBtn">← 上一月</button>
+                    <div id="currentMonthLabel"></div>
+                    <button id="nextMonthBtn">下一月 →</button>
+                </div>
+                <div class="subject-select-wrap">
+                    <label for="subjectSelect">科目：</label>
+                    <select id="subjectSelect">
+                        <option value="math">数学</option>
+                        <option value="reading">英语阅读</option>
+                        <option value="spelling">英语拼写</option>
+                    </select>
+                </div>
+            </div>
+        </header>
 
-        <!-- 数学正确率 -->
-        <section>
-            <h2>数学计算能力</h2>
-            <input type="number" id="mathInput" placeholder="输入正确率(%)">
-            <button onclick="updateAccuracy('math')">更新</button>
-            <canvas id="mathChart"></canvas>
+        <!-- 日历热力图 -->
+        <section class="calendar-section">
+            <div class="calendar-header">
+                <div class="weekday">一</div>
+                <div class="weekday">二</div>
+                <div class="weekday">三</div>
+                <div class="weekday">四</div>
+                <div class="weekday">五</div>
+                <div class="weekday">六</div>
+                <div class="weekday">日</div>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+            <div class="legend">
+                <span>低正确率</span>
+                <span class="legend-box legend-red-3"></span>
+                <span class="legend-box legend-red-2"></span>
+                <span class="legend-box legend-red-1"></span>
+                <span class="legend-box legend-green-1"></span>
+                <span class="legend-box legend-green-2"></span>
+                <span class="legend-box legend-green-3"></span>
+                <span>高正确率</span>
+            </div>
         </section>
 
-        <!-- 英语阅读正确率 -->
-        <section>
-            <h2>英语阅读</h2>
-            <input type="number" id="readingInput" placeholder="输入正确率(%)">
-            <button onclick="updateAccuracy('reading')">更新</button>
-            <canvas id="readingChart"></canvas>
+        <!-- 数据录入 -->
+        <section class="entry-section">
+            <h2>当天数据录入</h2>
+            <div class="date-line">
+                选中日期：<span id="selectedDateText">—</span>
+                <button id="todayBtn" class="secondary">跳到今天</button>
+            </div>
+            <div class="entry-grid">
+                <div class="entry-item">
+                    <label for="mathInput">数学正确率(%)</label>
+                    <input type="number" id="mathInput" min="0" max="100" placeholder="0-100">
+                </div>
+                <div class="entry-item">
+                    <label for="readingInput">英语阅读正确率(%)</label>
+                    <input type="number" id="readingInput" min="0" max="100" placeholder="0-100">
+                </div>
+                <div class="entry-item">
+                    <label for="spellingInput">英语拼写正确率(%)</label>
+                    <input type="number" id="spellingInput" min="0" max="100" placeholder="0-100">
+                </div>
+            </div>
+            <div class="entry-actions">
+                <button id="saveDayBtn">保存当天数据</button>
+                <button id="clearDayBtn" class="danger">清除当天数据</button>
+            </div>
+            <p class="hint">提示：输入 0-100 的数值。保存后日历颜色会更新。</p>
         </section>
 
-        <!-- 英语拼写正确率 -->
-        <section>
-            <h2>英语拼写</h2>
-            <input type="number" id="spellingInput" placeholder="输入正确率(%)">
-            <button onclick="updateAccuracy('spelling')">更新</button>
-            <canvas id="spellingChart"></canvas>
+        <!-- 柱状图 -->
+        <section class="chart-section">
+            <h2>当天三科正确率柱状图</h2>
+            <canvas id="dayBarChart"></canvas>
         </section>
 
         <!-- 错题本 -->
-        <section>
-            <h2>错题本</h2>
-            <input type="text" id="wrongQuestion" placeholder="输入错题">
-            <button onclick="addWrong()">添加错题</button>
-            <ul id="wrongList"></ul>
+        <section class="wrongbook-section">
+            <h2>错题本（按日期归档）</h2>
+            <div class="date-line">
+                当前日期：<span id="wrongDateText">—</span>
+            </div>
+            <div class="wrong-entry">
+                <input type="text" id="wrongQuestionInput" placeholder="输入错题题目或描述">
+                <button id="addWrongBtn">添加到错题本</button>
+            </div>
+            <ul id="wrongList" class="wrong-list"></ul>
+            <div class="wrong-actions">
+                <button id="clearWrongForDayBtn" class="danger">清除当前日期错题</button>
+            </div>
+        </section>
+
+        <!-- 导出 CSV -->
+        <section class="export-section">
+            <h2>数据导出</h2>
+            <button id="exportCsvBtn">导出 CSV</button>
         </section>
     </div>
 

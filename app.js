@@ -1,77 +1,347 @@
-// ³õÊ¼»¯Í¼±íº¯Êı
-function createChart(ctxId, label) {
-    const ctx = document.getElementById(ctxId).getContext('2d');
-    return new Chart(ctx, {
-        type: 'doughnut',
+// ===== å¸¸é‡ä¸å·¥å…· =====
+const SUBJECTS = ["math", "reading", "spelling"];
+const SUBJECT_LABELS = { math: "æ•°å­¦", reading: "è‹±è¯­é˜…è¯»", spelling: "è‹±è¯­æ‹¼å†™" };
+
+let currentYear, currentMonth;
+let selectedDateISO;
+let currentSubject = "math"; // é»˜è®¤ç€è‰²ç§‘ç›®
+
+function formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function clamp01(v) {
+    if (v === "" || v === null || v === undefined) return null;
+    const num = Number(v);
+    if (isNaN(num)) return null;
+    return Math.min(100, Math.max(0, num));
+}
+
+function colorForAccuracy(acc) {
+    if (acc === null) return "#e5e7eb";
+    if (acc < 30) return "#7f1d1d";
+    if (acc < 50) return "#b91c1c";
+    if (acc < 65) return "#ef4444";
+    if (acc < 80) return "#84cc16";
+    if (acc < 90) return "#22c55e";
+    return "#166534";
+}
+
+// ===== æœ¬åœ°å­˜å‚¨ =====
+function getHistory() {
+    return JSON.parse(localStorage.getItem("accuracyHistory") || "{}");
+}
+function setHistory(hist) {
+    localStorage.setItem("accuracyHistory", JSON.stringify(hist));
+}
+function getWrongBook() {
+    return JSON.parse(localStorage.getItem("wrongBook") || "{}");
+}
+function setWrongBook(wb) {
+    localStorage.setItem("wrongBook", JSON.stringify(wb));
+}
+
+// ===== æ—¥æœŸçŠ¶æ€ =====
+function setToToday() {
+    const today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth();
+    selectedDateISO = formatDate(today);
+}
+function setSelected(iso) {
+    selectedDateISO = iso;
+    document.getElementById("selectedDateText").textContent = iso;
+    document.getElementById("wrongDateText").textContent = iso;
+    loadInputsForSelectedDay();
+    renderBarForSelectedDay();
+    highlightSelectedCell();
+    renderWrongListForSelectedDay();
+}
+
+// ===== æ—¥å†æ¸²æŸ“ =====
+function renderMonthLabel() {
+    const label = document.getElementById("currentMonthLabel");
+    label.textContent = `${currentYear}å¹´${String(currentMonth + 1).padStart(2, "0")}æœˆ`;
+}
+function firstDayOffset(year, month) {
+    const d = new Date(year, month, 1);
+    const map = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 };
+    return map[d.getDay()];
+}
+function daysInMonth(year, month) {
+    return new Date(year, month + 1, 0).getDate();
+}
+function subjectAccuracy(dayData, subject) {
+    if (!dayData) return null;
+    const v = dayData[subject];
+    return typeof v === "number" ? v : null;
+}
+
+function renderCalendarGrid() {
+    const grid = document.getElementById("calendarGrid");
+    grid.innerHTML = "";
+    const hist = getHistory();
+
+    const offset = firstDayOffset(currentYear, currentMonth);
+    const totalDays = daysInMonth(currentYear, currentMonth);
+    const cells = [];
+
+    for (let i = 0; i < offset; i++) {
+        const blank = document.createElement("div");
+        blank.className = "day-cell";
+        blank.style.visibility = "hidden";
+        cells.push(blank);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+        const dateISO = formatDate(new Date(currentYear, currentMonth, day));
+        const dayCell = document.createElement("div");
+        dayCell.className = "day-cell";
+        dayCell.dataset.date = dateISO;
+
+        const dayNumber = document.createElement("div");
+        dayNumber.className = "day-number";
+        dayNumber.textContent = String(day);
+        dayCell.appendChild(dayNumber);
+
+        const acc = subjectAccuracy(hist[dateISO], currentSubject);
+        dayCell.style.background = colorForAccuracy(acc);
+        dayCell.style.borderColor = dayCell.style.background;
+
+        if (dateISO === selectedDateISO) {
+            dayCell.classList.add("selected");
+        }
+
+        dayCell.addEventListener("click", () => {
+            setSelected(dateISO);
+        });
+
+        cells.push(dayCell);
+    }
+
+    cells.forEach(c => grid.appendChild(c));
+}
+function highlightSelectedCell() {
+    document.querySelectorAll(".day-cell").forEach(el => {
+        el.classList.remove("selected");
+        if (el.dataset.date === selectedDateISO) {
+            el.classList.add("selected");
+        }
+    });
+}
+
+// ===== æ•°æ®å½•å…¥ =====
+function loadInputsForSelectedDay() {
+    const hist = getHistory();
+    const data = hist[selectedDateISO] || {};
+    document.getElementById("mathInput").value = data.math ?? "";
+    document.getElementById("readingInput").value = data.reading ?? "";
+    document.getElementById("spellingInput").value = data.spelling ?? "";
+}
+function saveDayData() {
+    const mathVal = clamp01(document.getElementById("mathInput").value);
+    const readingVal = clamp01(document.getElementById("readingInput").value);
+    const spellingVal = clamp01(document.getElementById("spellingInput").value);
+
+    const hist = getHistory();
+    hist[selectedDateISO] = hist[selectedDateISO] || {};
+    if (mathVal !== null) hist[selectedDateISO].math = mathVal;
+    if (readingVal !== null) hist[selectedDateISO].reading = readingVal;
+    if (spellingVal !== null) hist[selectedDateISO].spelling = spellingVal;
+    setHistory(hist);
+
+    renderCalendarGrid();
+    renderBarForSelectedDay();
+}
+function clearDayData() {
+    const hist = getHistory();
+    delete hist[selectedDateISO];
+    setHistory(hist);
+    document.getElementById("mathInput").value = "";
+    document.getElementById("readingInput").value = "";
+    document.getElementById("spellingInput").value = "";
+    renderCalendarGrid();
+    renderBarForSelectedDay();
+}
+
+// ===== æŸ±çŠ¶å›¾ =====
+let barChart;
+function initBarChart() {
+    const ctx = document.getElementById("dayBarChart").getContext("2d");
+    barChart = new Chart(ctx, {
+        type: "bar",
         data: {
-            labels: ['ÕıÈ·ÂÊ', '´íÎóÂÊ'],
+            labels: ["æ•°å­¦", "è‹±è¯­é˜…è¯»", "è‹±è¯­æ‹¼å†™"],
             datasets: [{
-                data: [0, 100],
-                backgroundColor: ['#4CAF50', '#F44336']
+                label: "æ­£ç¡®ç‡(%)",
+                data: [0, 0, 0],
+                backgroundColor: ["#93c5fd", "#bbf7d0", "#fde68a"]
             }]
         },
         options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, max: 100, ticks: { stepSize: 10 } }
+            },
             plugins: {
-                title: {
-                    display: true,
-                    text: label
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `æ­£ç¡®ç‡ï¼š${ctx.parsed.y}%`
+                    }
                 }
             }
         }
     });
 }
+function renderBarForSelectedDay() {
+    const hist = getHistory();
+    const day = hist[selectedDateISO] || {};
+    const vals = [
+        typeof day.math === "number" ? day.math : 0,
+        typeof day.reading === "number" ? day.reading : 0,
+        typeof day.spelling === "number" ? day.spelling : 0
+    ];
 
-// ´´½¨Èı¸öÍ¼±í
-let charts = {
-    math: createChart('mathChart', 'ÊıÑ§ÕıÈ·ÂÊ'),
-    reading: createChart('readingChart', 'Ó¢ÓïÔÄ¶ÁÕıÈ·ÂÊ'),
-    spelling: createChart('spellingChart', 'Ó¢ÓïÆ´Ğ´ÕıÈ·ÂÊ')
-};
+    const colors = ["#93c5fd", "#bbf7d0", "#fde68a"];
+    const highlightColors = { math: "#2563eb", reading: "#22c55e", spelling: "#f59e0b" };
+    const idx = SUBJECTS.indexOf(currentSubject);
+    colors[idx] = highlightColors[currentSubject];
 
-// ¸üĞÂÕıÈ·ÂÊ
-function updateAccuracy(subject) {
-    let inputId = subject + 'Input';
-    let value = document.getElementById(inputId).value;
-    if (value < 0 || value > 100) {
-        alert("ÇëÊäÈë0-100Ö®¼äµÄÊıÖµ");
-        return;
+    barChart.data.datasets[0].data = vals;
+    barChart.data.datasets[0].backgroundColor = colors;
+    barChart.update();
+}
+
+// ===== é”™é¢˜æœ¬ =====
+function renderWrongListForSelectedDay() {
+    const wb = getWrongBook();
+    const list = document.getElementById("wrongList");
+    list.innerHTML = "";
+    const arr = wb[selectedDateISO] || [];
+    arr.forEach((q, idx) => {
+        const li = document.createElement("li");
+        const text = document.createElement("span");
+        text.textContent = q;
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "åˆ é™¤";
+        delBtn.addEventListener("click", () => {
+            const wbNow = getWrongBook();
+            (wbNow[selectedDateISO] = wbNow[selectedDateISO] || []).splice(idx, 1);
+            setWrongBook(wbNow);
+            renderWrongListForSelectedDay();
+        });
+        li.appendChild(text);
+        li.appendChild(delBtn);
+        list.appendChild(li);
+    });
+}
+
+function addWrongToBook() {
+    const input = document.getElementById("wrongQuestionInput");
+    const val = (input.value || "").trim();
+    if (!val) return;
+    const wb = getWrongBook();
+    wb[selectedDateISO] = wb[selectedDateISO] || [];
+    wb[selectedDateISO].push(val);
+    setWrongBook(wb);
+    input.value = "";
+    renderWrongListForSelectedDay();
+}
+
+function clearWrongForDay() {
+    const wb = getWrongBook();
+    delete wb[selectedDateISO];
+    setWrongBook(wb);
+    renderWrongListForSelectedDay();
+}
+
+// ===== å¯¼å‡º CSV =====
+function exportToCSV() {
+    const hist = getHistory();
+    const wb = getWrongBook();
+
+    let csv = "æ—¥æœŸ,æ•°å­¦æ­£ç¡®ç‡,è‹±è¯­é˜…è¯»æ­£ç¡®ç‡,è‹±è¯­æ‹¼å†™æ­£ç¡®ç‡,é”™é¢˜\n";
+    const allDates = new Set([...Object.keys(hist), ...Object.keys(wb)]);
+    const sortedDates = Array.from(allDates).sort();
+
+    sortedDates.forEach(date => {
+        const day = hist[date] || {};
+        const wrongs = wb[date] ? wb[date].join("; ") : "";
+        const math = day.math ?? "";
+        const reading = day.reading ?? "";
+        const spelling = day.spelling ?? "";
+        csv += `${date},${math},${reading},${spelling},"${wrongs}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "å­¦ä¹ æˆé•¿è®°å½•.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ===== æœˆä»½åˆ‡æ¢ =====
+function gotoPrevMonth() {
+    if (currentMonth === 0) {
+        currentMonth = 11;
+        currentYear -= 1;
+    } else {
+        currentMonth -= 1;
     }
-    localStorage.setItem(subject + 'Accuracy', value);
-    charts[subject].data.datasets[0].data = [value, 100 - value];
-    charts[subject].update();
+    renderMonthLabel();
+    renderCalendarGrid();
+    highlightSelectedCell();
 }
 
-// ´íÌâ±¾¹¦ÄÜ
-function addWrong() {
-    let question = document.getElementById('wrongQuestion').value;
-    if (!question) return;
-    let list = document.getElementById('wrongList');
-    let li = document.createElement('li');
-    li.textContent = question;
-    list.appendChild(li);
-
-    // ±£´æµ½ localStorage
-    let wrongs = JSON.parse(localStorage.getItem('wrongs') || '[]');
-    wrongs.push(question);
-    localStorage.setItem('wrongs', JSON.stringify(wrongs));
-
-    document.getElementById('wrongQuestion').value = "";
+function gotoNextMonth() {
+    if (currentMonth === 11) {
+        currentMonth = 0;
+        currentYear += 1;
+    } else {
+        currentMonth += 1;
+    }
+    renderMonthLabel();
+    renderCalendarGrid();
+    highlightSelectedCell();
 }
 
-// Ò³Ãæ¼ÓÔØÊ±»Ö¸´Êı¾İ
-window.onload = () => {
-    ['math', 'reading', 'spelling'].forEach(subject => {
-        let saved = localStorage.getItem(subject + 'Accuracy');
-        if (saved) {
-            charts[subject].data.datasets[0].data = [saved, 100 - saved];
-            charts[subject].update();
-        }
-    });
+function gotoToday() {
+    setToToday();
+    renderMonthLabel();
+    renderCalendarGrid();
+    setSelected(selectedDateISO);
+}
 
-    let wrongs = JSON.parse(localStorage.getItem('wrongs') || '[]');
-    wrongs.forEach(q => {
-        let li = document.createElement('li');
-        li.textContent = q;
-        document.getElementById('wrongList').appendChild(li);
+// ===== åˆå§‹åŒ– =====
+window.addEventListener("DOMContentLoaded", () => {
+    setToToday();
+    renderMonthLabel();
+    renderCalendarGrid();
+
+    initBarChart();
+    setSelected(selectedDateISO);
+
+    document.getElementById("prevMonthBtn").addEventListener("click", gotoPrevMonth);
+    document.getElementById("nextMonthBtn").addEventListener("click", gotoNextMonth);
+    document.getElementById("todayBtn").addEventListener("click", gotoToday);
+
+    document.getElementById("saveDayBtn").addEventListener("click", saveDayData);
+    document.getElementById("clearDayBtn").addEventListener("click", clearDayData);
+
+    document.getElementById("addWrongBtn").addEventListener("click", addWrongToBook);
+    document.getElementById("clearWrongForDayBtn").addEventListener("click", clearWrongForDay);
+
+    document.getElementById("exportCsvBtn").addEventListener("click", exportToCSV);
+
+    document.getElementById("subjectSelect").addEventListener("change", (e) => {
+        currentSubject = e.target.value;
+        renderCalendarGrid();
+        renderBarForSelectedDay();
     });
-};
+});
