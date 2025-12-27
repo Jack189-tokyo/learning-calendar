@@ -85,12 +85,18 @@
             <canvas id="dayBarChart"></canvas>
         </section>
 
-        <!-- 错题本 -->
+        <!-- 错题本（日记格式） -->
         <section class="wrongbook-section">
-            <h2>错题本（按日期归档）</h2>
+            <h2>错题本（日记格式）</h2>
             <div class="date-line">
                 当前日期：<span id="wrongDateText">—</span>
+                <button id="wrongTodayBtn" class="secondary">回到今天</button>
             </div>
+            <div class="wrong-nav">
+                <button id="wrongPrevBtn">← 上一页</button>
+                <button id="wrongNextBtn">下一页 →</button>
+            </div>
+            <div class="wrong-calendar" id="wrongCalendar"></div>
             <div class="wrong-entry">
                 <input type="text" id="wrongQuestionInput" placeholder="输入错题题目或描述">
                 <button id="addWrongBtn">添加到错题本</button>

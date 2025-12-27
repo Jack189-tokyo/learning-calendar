@@ -6,6 +6,10 @@ let currentYear, currentMonth;
 let selectedDateISO;
 let currentSubject = "math"; // 默认着色科目
 
+// 错题本日记状态
+let wrongDates = [];
+let currentWrongIndex = 0;
+
 function formatDate(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -216,7 +220,7 @@ function renderBarForSelectedDay() {
     barChart.update();
 }
 
-// ===== 错题本 =====
+// ===== 错题本（日记格式） =====
 function renderWrongListForSelectedDay() {
     const wb = getWrongBook();
     const list = document.getElementById("wrongList");
@@ -233,6 +237,7 @@ function renderWrongListForSelectedDay() {
             (wbNow[selectedDateISO] = wbNow[selectedDateISO] || []).splice(idx, 1);
             setWrongBook(wbNow);
             renderWrongListForSelectedDay();
+            renderWrongCalendar(); // 更新日期按钮
         });
         li.appendChild(text);
         li.appendChild(delBtn);
@@ -250,6 +255,7 @@ function addWrongToBook() {
     setWrongBook(wb);
     input.value = "";
     renderWrongListForSelectedDay();
+    renderWrongCalendar();
 }
 
 function clearWrongForDay() {
@@ -257,6 +263,56 @@ function clearWrongForDay() {
     delete wb[selectedDateISO];
     setWrongBook(wb);
     renderWrongListForSelectedDay();
+    renderWrongCalendar();
+}
+
+// ===== 错题本日记翻页与日期跳转 =====
+function renderWrongCalendar() {
+    const wb = getWrongBook();
+    const container = document.getElementById("wrongCalendar");
+    container.innerHTML = "";
+    wrongDates = Object.keys(wb).sort();
+    wrongDates.forEach(date => {
+        const btn = document.createElement("button");
+        btn.textContent = date;
+        btn.className = "wrong-date-btn";
+        if (wb[date] && wb[date].length > 0) {
+            btn.classList.add("has-wrong"); // 有错题记录标记绿色
+        }
+        btn.addEventListener("click", () => {
+            currentWrongIndex = wrongDates.indexOf(date);
+            renderWrongDiary(date);
+        });
+        container.appendChild(btn);
+    });
+}
+
+function renderWrongDiary(dateISO) {
+    selectedDateISO = dateISO;
+    document.getElementById("wrongDateText").textContent = dateISO;
+    renderWrongListForSelectedDay();
+}
+
+function gotoWrongPrev() {
+    if (currentWrongIndex > 0) {
+        currentWrongIndex--;
+        renderWrongDiary(wrongDates[currentWrongIndex]);
+    }
+}
+function gotoWrongNext() {
+    if (currentWrongIndex < wrongDates.length - 1) {
+        currentWrongIndex++;
+        renderWrongDiary(wrongDates[currentWrongIndex]);
+    }
+}
+function gotoWrongToday() {
+    const today = formatDate(new Date());
+    if (wrongDates.includes(today)) {
+        currentWrongIndex = wrongDates.indexOf(today);
+        renderWrongDiary(today);
+    } else {
+        renderWrongDiary(today);
+    }
 }
 
 // ===== 导出 CSV =====
@@ -298,7 +354,6 @@ function gotoPrevMonth() {
     renderCalendarGrid();
     highlightSelectedCell();
 }
-
 function gotoNextMonth() {
     if (currentMonth === 11) {
         currentMonth = 0;
@@ -310,7 +365,6 @@ function gotoNextMonth() {
     renderCalendarGrid();
     highlightSelectedCell();
 }
-
 function gotoToday() {
     setToToday();
     renderMonthLabel();
@@ -327,18 +381,27 @@ window.addEventListener("DOMContentLoaded", () => {
     initBarChart();
     setSelected(selectedDateISO);
 
+    // 日历导航
     document.getElementById("prevMonthBtn").addEventListener("click", gotoPrevMonth);
     document.getElementById("nextMonthBtn").addEventListener("click", gotoNextMonth);
     document.getElementById("todayBtn").addEventListener("click", gotoToday);
 
+    // 数据录入
     document.getElementById("saveDayBtn").addEventListener("click", saveDayData);
     document.getElementById("clearDayBtn").addEventListener("click", clearDayData);
 
+    // 错题本
     document.getElementById("addWrongBtn").addEventListener("click", addWrongToBook);
     document.getElementById("clearWrongForDayBtn").addEventListener("click", clearWrongForDay);
+    document.getElementById("wrongPrevBtn").addEventListener("click", gotoWrongPrev);
+    document.getElementById("wrongNextBtn").addEventListener("click", gotoWrongNext);
+    document.getElementById("wrongTodayBtn").addEventListener("click", gotoWrongToday);
+    renderWrongCalendar();
 
+    // 导出 CSV
     document.getElementById("exportCsvBtn").addEventListener("click", exportToCSV);
 
+    // 科目选择
     document.getElementById("subjectSelect").addEventListener("change", (e) => {
         currentSubject = e.target.value;
         renderCalendarGrid();
