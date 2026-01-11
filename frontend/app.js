@@ -1,15 +1,30 @@
-// ===== 常量与工具 =====
+// ===== 云开发初始化 (兼容 SDK 1.x 与 2.x) =====
+const ENV_ID = "learning-record-2gmf3u9w968a4b6e";
+
+// 自动识别全局变量 (1.x 常用 tcb, 2.x 常用 cloudbase)
+const cloudbaseProvider = window.cloudbase || window.tcb;
+
+if (!cloudbaseProvider) {
+    console.error("SDK 未能成功加载，请检查 HTML 中的脚本链接。");
+}
+
+const tcbApp = cloudbaseProvider.init({
+    env: ENV_ID
+});
+
+// 开启本地持久化，避免每次刷新都重新请求服务器
+const auth = tcbApp.auth({ persistence: "local" });
+let currentUserUID = null;
+
+// ===== 常量与变量 =====
 const SUBJECTS = ["math", "reading", "spelling"];
 const SUBJECT_LABELS = { math: "数学", reading: "英语阅读", spelling: "英语拼写" };
 
-let currentYear, currentMonth;
-let selectedDateISO;
-let currentSubject = "math"; // 默认着色科目
+let currentYear, currentMonth, selectedDateISO;
+let currentSubject = "math";
+let barChart;
 
-// 错题本日记状态
-let wrongDates = [];
-let currentWrongIndex = 0;
-
+// ===== 工具函数 =====
 function formatDate(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -34,70 +49,93 @@ function colorForAccuracy(acc) {
     return "#166534";
 }
 
-// ===== 本地存储 =====
-function getHistory() {
-    return JSON.parse(localStorage.getItem("accuracyHistory") || "{}");
-}
-function setHistory(hist) {
-    localStorage.setItem("accuracyHistory", JSON.stringify(hist));
-}
-function getWrongBook() {
-    return JSON.parse(localStorage.getItem("wrongBook") || "{}");
-}
-function setWrongBook(wb) {
-    localStorage.setItem("wrongBook", JSON.stringify(wb));
+// ===== 本地存储管理 =====
+function getHistory() { return JSON.parse(localStorage.getItem("accuracyHistory") || "{}"); }
+function setHistory(hist) { localStorage.setItem("accuracyHistory", JSON.stringify(hist)); }
+function getWrongBook() { return JSON.parse(localStorage.getItem("wrongBook") || "{}"); }
+function setWrongBook(wb) { localStorage.setItem("wrongBook", JSON.stringify(wb)); }
+function getHonorWall() { return JSON.parse(localStorage.getItem("honorWall") || "[]"); }
+function setHonorWall(hw) { localStorage.setItem("honorWall", JSON.stringify(hw)); }
+
+// ===== 云端核心功能 =====
+async function syncToCloud() {
+    if (!currentUserUID) return;
+    const btn = document.getElementById("syncCloudBtn");
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ 同步中...";
+
+    try {
+        const payload = {
+            uid: currentUserUID,
+            history: getHistory(),
+            wrongBook: getWrongBook(),
+            honorWall: getHonorWall()
+        };
+
+        await tcbApp.callFunction({
+            name: "api",
+            data: {
+                path: "/api/sync",
+                httpMethod: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        });
+
+        btn.textContent = "✅ 已同步";
+        setTimeout(() => btn.textContent = "☁️ 手动同步", 2000);
+    } catch (e) {
+        console.error("同步失败:", e);
+        btn.textContent = "❌ 失败";
+        setTimeout(() => btn.textContent = originalText, 2000);
+    }
 }
 
-// ===== 日期状态 =====
-function setToToday() {
-    const today = new Date();
-    currentYear = today.getFullYear();
-    currentMonth = today.getMonth();
-    selectedDateISO = formatDate(today);
-}
-function setSelected(iso) {
-    selectedDateISO = iso;
-    document.getElementById("selectedDateText").textContent = iso;
-    document.getElementById("wrongDateText").textContent = iso;
-    loadInputsForSelectedDay();
-    renderBarForSelectedDay();
-    highlightSelectedCell();
-    renderWrongListForSelectedDay();
+async function pullFromCloud() {
+    if (!currentUserUID) return;
+    try {
+        const res = await tcbApp.callFunction({
+            name: "api",
+            data: {
+                path: `/api/data/${currentUserUID}`,
+                httpMethod: "GET"
+            }
+        });
+
+        const responseData = typeof res.result.body === 'string' ? JSON.parse(res.result.body) : res.result.body;
+        const cloudData = responseData.data;
+
+        if (cloudData && Object.keys(cloudData).length > 0) {
+            if (confirm("发现云端有备份记录，是否下载并覆盖本地数据？")) {
+                setHistory(cloudData.history || {});
+                setWrongBook(cloudData.wrongBook || {});
+                setHonorWall(cloudData.honorWall || []);
+                location.reload();
+            }
+        }
+    } catch (e) {
+        console.error("拉取云端数据失败:", e);
+    }
 }
 
-// ===== 日历渲染 =====
+// ===== 渲染逻辑 =====
 function renderMonthLabel() {
-    const label = document.getElementById("currentMonthLabel");
-    label.textContent = `${currentYear}年${String(currentMonth + 1).padStart(2, "0")}月`;
-}
-function firstDayOffset(year, month) {
-    const d = new Date(year, month, 1);
-    const map = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 };
-    return map[d.getDay()];
-}
-function daysInMonth(year, month) {
-    return new Date(year, month + 1, 0).getDate();
-}
-function subjectAccuracy(dayData, subject) {
-    if (!dayData) return null;
-    const v = dayData[subject];
-    return typeof v === "number" ? v : null;
+    document.getElementById("currentMonthLabel").textContent = `${currentYear}年${String(currentMonth + 1).padStart(2, "0")}月`;
 }
 
 function renderCalendarGrid() {
     const grid = document.getElementById("calendarGrid");
     grid.innerHTML = "";
     const hist = getHistory();
-
-    const offset = firstDayOffset(currentYear, currentMonth);
-    const totalDays = daysInMonth(currentYear, currentMonth);
-    const cells = [];
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const offset = (firstDay === 0 ? 6 : firstDay - 1);
+    const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
 
     for (let i = 0; i < offset; i++) {
         const blank = document.createElement("div");
         blank.className = "day-cell";
         blank.style.visibility = "hidden";
-        cells.push(blank);
+        grid.appendChild(blank);
     }
 
     for (let day = 1; day <= totalDays; day++) {
@@ -105,163 +143,88 @@ function renderCalendarGrid() {
         const dayCell = document.createElement("div");
         dayCell.className = "day-cell";
         dayCell.dataset.date = dateISO;
+        if (dateISO === selectedDateISO) dayCell.classList.add("selected");
 
         const dayNumber = document.createElement("div");
         dayNumber.className = "day-number";
-        dayNumber.textContent = String(day);
+        dayNumber.textContent = day;
         dayCell.appendChild(dayNumber);
 
-        const acc = subjectAccuracy(hist[dateISO], currentSubject);
+        const dayData = hist[dateISO];
+        const acc = dayData ? dayData[currentSubject] : null;
         dayCell.style.background = colorForAccuracy(acc);
         dayCell.style.borderColor = dayCell.style.background;
 
-        if (dateISO === selectedDateISO) {
-            dayCell.classList.add("selected");
-        }
-
-        dayCell.addEventListener("click", () => {
-            setSelected(dateISO);
-        });
-
-        cells.push(dayCell);
+        dayCell.addEventListener("click", () => setSelected(dateISO));
+        grid.appendChild(dayCell);
     }
-
-    cells.forEach(c => grid.appendChild(c));
-}
-function highlightSelectedCell() {
-    document.querySelectorAll(".day-cell").forEach(el => {
-        el.classList.remove("selected");
-        if (el.dataset.date === selectedDateISO) {
-            el.classList.add("selected");
-        }
-    });
 }
 
-// ===== 数据录入 =====
-function loadInputsForSelectedDay() {
+function setSelected(iso) {
+    selectedDateISO = iso;
+    document.getElementById("selectedDateText").textContent = iso;
+    document.getElementById("wrongDateText").textContent = iso;
+
     const hist = getHistory();
-    const data = hist[selectedDateISO] || {};
+    const data = hist[iso] || {};
     document.getElementById("mathInput").value = data.math ?? "";
     document.getElementById("readingInput").value = data.reading ?? "";
     document.getElementById("spellingInput").value = data.spelling ?? "";
-}
-function saveDayData() {
-    const mathVal = clamp01(document.getElementById("mathInput").value);
-    const readingVal = clamp01(document.getElementById("readingInput").value);
-    const spellingVal = clamp01(document.getElementById("spellingInput").value);
 
-    const hist = getHistory();
-    hist[selectedDateISO] = hist[selectedDateISO] || {};
-    if (mathVal !== null) hist[selectedDateISO].math = mathVal;
-    if (readingVal !== null) hist[selectedDateISO].reading = readingVal;
-    if (spellingVal !== null) hist[selectedDateISO].spelling = spellingVal;
-    setHistory(hist);
-
-    renderCalendarGrid();
     renderBarForSelectedDay();
-
-    // 奖牌判定
-    checkMedalForDay();
-}
-function clearDayData() {
-    // 删除当天学习数据
-    const hist = getHistory();
-    delete hist[selectedDateISO];
-    setHistory(hist);
-
-    // 清空输入框
-    document.getElementById("mathInput").value = "";
-    document.getElementById("readingInput").value = "";
-    document.getElementById("spellingInput").value = "";
-
-    // 更新日历和柱状图
-    renderCalendarGrid();
-    renderBarForSelectedDay();
-
-    // 删除当天奖牌
-    let honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
-    honor = honor.filter(item => item.date !== selectedDateISO);
-    localStorage.setItem("honorWall", JSON.stringify(honor));
-    renderHonorWall();
+    renderWrongListForSelectedDay();
+    highlightSelectedCell();
 }
 
-// ===== 柱状图 =====
-let barChart;
+function highlightSelectedCell() {
+    document.querySelectorAll(".day-cell").forEach(el => {
+        el.classList.toggle("selected", el.dataset.date === selectedDateISO);
+    });
+}
+
 function initBarChart() {
     const ctx = document.getElementById("dayBarChart").getContext("2d");
+    if (!ctx) return;
     barChart = new Chart(ctx, {
         type: "bar",
         data: {
-            labels: ["数学", "英语阅读", "英语拼写"],
-            datasets: [{
-                label: "正确率(%)",
-                data: [0, 0, 0],
-                backgroundColor: ["#93c5fd", "#bbf7d0", "#fde68a"]
-            }]
+            labels: ["数学", "阅读", "拼写"],
+            datasets: [{ data: [0, 0, 0], backgroundColor: ["#93c5fd", "#bbf7d0", "#fde68a"] }]
         },
         options: {
             responsive: true,
-            scales: {
-                y: { beginAtZero: true, max: 100, ticks: { stepSize: 10 } }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => `正确率：${ctx.parsed.y}%`
-                    }
-                }
-            }
+            scales: { y: { beginAtZero: true, max: 100 } },
+            plugins: { legend: { display: false } }
         }
     });
 }
+
 function renderBarForSelectedDay() {
+    if (!barChart) return;
     const hist = getHistory();
     const day = hist[selectedDateISO] || {};
-    const vals = [
-        typeof day.math === "number" ? day.math : 0,
-        typeof day.reading === "number" ? day.reading : 0,
-        typeof day.spelling === "number" ? day.spelling : 0
-    ];
-
-    const colors = ["#93c5fd", "#bbf7d0", "#fde68a"];
-    const highlightColors = { math: "#2563eb", reading: "#22c55e", spelling: "#f59e0b" };
-    const idx = SUBJECTS.indexOf(currentSubject);
-    colors[idx] = highlightColors[currentSubject];
-
-    barChart.data.datasets[0].data = vals;
-    barChart.data.datasets[0].backgroundColor = colors;
+    barChart.data.datasets[0].data = [day.math || 0, day.reading || 0, day.spelling || 0];
     barChart.update();
 }
 
-// ===== 错题本（日记格式） =====
-function renderWrongListForSelectedDay() {
-    const wb = getWrongBook();
-    const list = document.getElementById("wrongList");
-    list.innerHTML = "";
-    const arr = wb[selectedDateISO] || [];
-    arr.forEach((q, idx) => {
-        const li = document.createElement("li");
-        const text = document.createElement("span");
-        text.textContent = q;
-        const delBtn = document.createElement("button");
-        delBtn.textContent = "删除";
-        delBtn.addEventListener("click", () => {
-            const wbNow = getWrongBook();
-            (wbNow[selectedDateISO] = wbNow[selectedDateISO] || []).splice(idx, 1);
-            setWrongBook(wbNow);
-            renderWrongListForSelectedDay();
-            renderWrongCalendar(); // 更新日期按钮
-        });
-        li.appendChild(text);
-        li.appendChild(delBtn);
-        list.appendChild(li);
-    });
+// ===== 交互功能 =====
+function saveDayData() {
+    const hist = getHistory();
+    hist[selectedDateISO] = {
+        math: clamp01(document.getElementById("mathInput").value),
+        reading: clamp01(document.getElementById("readingInput").value),
+        spelling: clamp01(document.getElementById("spellingInput").value)
+    };
+    setHistory(hist);
+    renderCalendarGrid();
+    renderBarForSelectedDay();
+    checkMedalForDay();
+    syncToCloud();
 }
 
 function addWrongToBook() {
     const input = document.getElementById("wrongQuestionInput");
-    const val = (input.value || "").trim();
+    const val = input.value.trim();
     if (!val) return;
     const wb = getWrongBook();
     wb[selectedDateISO] = wb[selectedDateISO] || [];
@@ -270,204 +233,132 @@ function addWrongToBook() {
     input.value = "";
     renderWrongListForSelectedDay();
     renderWrongCalendar();
+    syncToCloud();
 }
 
-function clearWrongForDay() {
+function renderWrongListForSelectedDay() {
+    const list = document.getElementById("wrongList");
+    if (!list) return;
+    list.innerHTML = "";
+    const arr = getWrongBook()[selectedDateISO] || [];
+    arr.forEach((q, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${q}</span><button onclick="deleteWrong(${idx})">删除</button>`;
+        list.appendChild(li);
+    });
+}
+
+window.deleteWrong = (idx) => {
     const wb = getWrongBook();
-    delete wb[selectedDateISO];
+    wb[selectedDateISO].splice(idx, 1);
     setWrongBook(wb);
     renderWrongListForSelectedDay();
     renderWrongCalendar();
-}
+    syncToCloud();
+};
 
-// ===== 错题本日记翻页与日期跳转 =====
 function renderWrongCalendar() {
-    const wb = getWrongBook();
     const container = document.getElementById("wrongCalendar");
+    if (!container) return;
     container.innerHTML = "";
-    wrongDates = Object.keys(wb).sort();
-    wrongDates.forEach(date => {
+    const wb = getWrongBook();
+    Object.keys(wb).sort().forEach(date => {
+        if (wb[date].length === 0) return;
         const btn = document.createElement("button");
         btn.textContent = date;
-        btn.className = "wrong-date-btn";
-        if (wb[date] && wb[date].length > 0) {
-            btn.classList.add("has-wrong"); // 有错题记录标记绿色
-        }
-        btn.addEventListener("click", () => {
-            currentWrongIndex = wrongDates.indexOf(date);
-            renderWrongDiary(date);
-        });
+        btn.className = "wrong-date-btn has-wrong";
+        btn.onclick = () => setSelected(date);
         container.appendChild(btn);
     });
 }
 
-function renderWrongDiary(dateISO) {
-    selectedDateISO = dateISO;
-    document.getElementById("wrongDateText").textContent = dateISO;
-    renderWrongListForSelectedDay();
-}
-
-function gotoWrongPrev() {
-    if (currentWrongIndex > 0) {
-        currentWrongIndex--;
-        renderWrongDiary(wrongDates[currentWrongIndex]);
-    }
-}
-function gotoWrongNext() {
-    if (currentWrongIndex < wrongDates.length - 1) {
-        currentWrongIndex++;
-        renderWrongDiary(wrongDates[currentWrongIndex]);
-    }
-}
-function gotoWrongToday() {
-    const today = formatDate(new Date());
-    if (wrongDates.includes(today)) {
-        currentWrongIndex = wrongDates.indexOf(today);
-        renderWrongDiary(today);
-    } else {
-        renderWrongDiary(today);
-    }
-}
-
-// ===== 成就系统（奖牌判定 + 荣誉墙） =====
 function checkMedalForDay() {
-    const hist = getHistory();
-    const day = hist[selectedDateISO] || {};
-    const scores = [day.math, day.reading, day.spelling].filter(v => typeof v === "number");
-    const count90 = scores.filter(v => v >= 90).length;
-
-    let medal = null;
-    if (count90 === 3) medal = "🥇 金牌";
-    else if (count90 === 2) medal = "🥈 银牌";
-    else if (count90 === 1) medal = "🥉 铜牌";
-
+    const day = getHistory()[selectedDateISO] || {};
+    const scores = [day.math, day.reading, day.spelling].filter(v => v !== null && v >= 90);
+    let medal = scores.length === 3 ? "🥇 金牌" : scores.length === 2 ? "🥈 银牌" : scores.length === 1 ? "🥉 铜牌" : null;
     if (medal) {
-        showMedalPopup(medal);
-        addMedalToHonorWall(selectedDateISO, medal);
+        const pop = document.getElementById("medalPopup");
+        if (pop) {
+            pop.textContent = medal; pop.style.display = "block";
+            setTimeout(() => pop.style.display = "none", 3000);
+        }
+        const hw = getHonorWall();
+        hw.push({ date: selectedDateISO, medal });
+        setHonorWall(hw);
+        renderHonorWall();
     }
-}
-
-function showMedalPopup(medalText) {
-    const popup = document.getElementById("medalPopup");
-    popup.textContent = medalText;
-    popup.style.display = "block";
-    setTimeout(() => {
-        popup.style.display = "none";
-    }, 3000);
-}
-
-function addMedalToHonorWall(date, medalText) {
-    const honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
-    honor.push({ date, medal: medalText });
-    localStorage.setItem("honorWall", JSON.stringify(honor));
-    renderHonorWall();
 }
 
 function renderHonorWall() {
-    const honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
     const wall = document.getElementById("honorWall");
-    wall.innerHTML = "";
-    honor.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "honor-item";
-        div.textContent = `${item.date} ${item.medal}`;
-        wall.appendChild(div);
-    });
+    if (!wall) return;
+    wall.innerHTML = getHonorWall().map(i => `<div class="honor-item">${i.date} ${i.medal}</div>`).join("");
 }
 
-// ===== 导出 CSV =====
-function exportToCSV() {
-    const hist = getHistory();
-    const wb = getWrongBook();
+// ===== 初始化入口 =====
+window.addEventListener("DOMContentLoaded", async () => {
+    const today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth();
+    selectedDateISO = formatDate(today);
 
-    let csv = "日期,数学正确率,英语阅读正确率,英语拼写正确率,错题\n";
-    const allDates = new Set([...Object.keys(hist), ...Object.keys(wb)]);
-    const sortedDates = Array.from(allDates).sort();
-
-    sortedDates.forEach(date => {
-        const day = hist[date] || {};
-        const wrongs = wb[date] ? wb[date].join("; ") : "";
-        const math = day.math ?? "";
-        const reading = day.reading ?? "";
-        const spelling = day.spelling ?? "";
-        csv += `${date},${math},${reading},${spelling},"${wrongs}"\n`;
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "学习成长记录.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-// ===== 月份切换 =====
-function gotoPrevMonth() {
-    if (currentMonth === 0) {
-        currentMonth = 11;
-        currentYear -= 1;
-    } else {
-        currentMonth -= 1;
-    }
     renderMonthLabel();
     renderCalendarGrid();
-    highlightSelectedCell();
-}
-function gotoNextMonth() {
-    if (currentMonth === 11) {
-        currentMonth = 0;
-        currentYear += 1;
-    } else {
-        currentMonth += 1;
-    }
-    renderMonthLabel();
-    renderCalendarGrid();
-    highlightSelectedCell();
-}
-function gotoToday() {
-    setToToday();
-    renderMonthLabel();
-    renderCalendarGrid();
-    setSelected(selectedDateISO);
-}
-
-// ===== 初始化 =====
-window.addEventListener("DOMContentLoaded", () => {
-    setToToday();
-    renderMonthLabel();
-    renderCalendarGrid();
-
     initBarChart();
     setSelected(selectedDateISO);
-
-    // 日历导航
-    document.getElementById("prevMonthBtn").addEventListener("click", gotoPrevMonth);
-    document.getElementById("nextMonthBtn").addEventListener("click", gotoNextMonth);
-    document.getElementById("todayBtn").addEventListener("click", gotoToday);
-
-    // 数据录入
-    document.getElementById("saveDayBtn").addEventListener("click", saveDayData);
-    document.getElementById("clearDayBtn").addEventListener("click", clearDayData);
-
-    // 错题本
-    document.getElementById("addWrongBtn").addEventListener("click", addWrongToBook);
-    document.getElementById("clearWrongForDayBtn").addEventListener("click", clearWrongForDay);
-    document.getElementById("wrongPrevBtn").addEventListener("click", gotoWrongPrev);
-    document.getElementById("wrongNextBtn").addEventListener("click", gotoWrongNext);
-    document.getElementById("wrongTodayBtn").addEventListener("click", gotoWrongToday);
     renderWrongCalendar();
-
-    // 荣誉墙初始化
     renderHonorWall();
 
-    // 导出 CSV
-    document.getElementById("exportCsvBtn").addEventListener("click", exportToCSV);
+    // 尝试登录云端
+    try {
+        console.log("正在准备登录...");
+        const statusEl = document.getElementById("loginStatus");
+        statusEl.textContent = "⏳ 正在验证身份...";
 
-    // 科目选择
-    document.getElementById("subjectSelect").addEventListener("change", (e) => {
-        currentSubject = e.target.value;
-        renderCalendarGrid();
-        renderBarForSelectedDay();
-    });
+        // 1. 获取现有登录态
+        let loginState = await auth.getLoginState();
+        console.log("初始登录状态:", loginState);
+
+        // 2. 如果未登录，执行账号密码登录
+        if (!loginState) {
+            console.log("未检测到登录态，尝试 signInWithPassword...");
+            loginState = await auth.signInWithPassword("Jack", "ABCabc123123.");
+            console.log("登录接口响应:", loginState);
+        }
+
+        // 3. 提取 UID 并更新 UI
+        if (loginState && loginState.user) {
+            currentUserUID = loginState.user.uid;
+            console.log("登录成功，UID:", currentUserUID);
+
+            const displayId = currentUserUID ? String(currentUserUID).slice(0, 6) : "Guest";
+            statusEl.innerHTML = `✅ 已连接 (账号: Jack) <small>ID: ${displayId}</small>`;
+            statusEl.style.color = "#059669";
+
+            const syncBtn = document.getElementById("syncCloudBtn");
+            if (syncBtn) syncBtn.style.display = "block";
+
+            pullFromCloud();
+        } else {
+            throw new Error("未能获取用户信息，请检查控制台账号设置");
+        }
+    } catch (e) {
+        console.error("云端登录详细错误:", e);
+        const statusEl = document.getElementById("loginStatus");
+        statusEl.textContent = "❌ 登录失败: " + (e.message || "账号验证未通过");
+        statusEl.style.color = "#dc2626";
+    }
+
+    // 绑定基础事件
+    document.getElementById("prevMonthBtn").onclick = () => { if (currentMonth === 0) { currentMonth = 11; currentYear--; } else { currentMonth--; } renderMonthLabel(); renderCalendarGrid(); highlightSelectedCell(); };
+    document.getElementById("nextMonthBtn").onclick = () => { if (currentMonth === 11) { currentMonth = 0; currentYear++; } else { currentMonth++; } renderMonthLabel(); renderCalendarGrid(); highlightSelectedCell(); };
+    document.getElementById("todayBtn").onclick = () => { const t = new Date(); currentYear = t.getFullYear(); currentMonth = t.getMonth(); setSelected(formatDate(t)); renderMonthLabel(); renderCalendarGrid(); };
+    document.getElementById("saveDayBtn").onclick = saveDayData;
+    document.getElementById("addWrongBtn").onclick = addWrongToBook;
+    document.getElementById("syncCloudBtn").onclick = syncToCloud;
+
+    const subjectSelect = document.getElementById("subjectSelect");
+    if (subjectSelect) {
+        subjectSelect.onchange = (e) => { currentSubject = e.target.value; renderCalendarGrid(); renderBarForSelectedDay(); };
+    }
 });

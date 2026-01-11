@@ -1,0 +1,16 @@
+{
+  "envId": "learning-record-2gmf3u9w968a4b6e",
+  "framework": {
+    "name": "learning-app",
+    "plugins": {}
+  },
+  "functions": [
+    {
+      "name": "api",
+      "root": "./",
+      "handler": "index.main",
+      "runtime": "Nodejs12.16",
+      "installDependency": true
+    }
+  ]
+}

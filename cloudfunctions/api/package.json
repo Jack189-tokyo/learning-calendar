@@ -1,16 +1,11 @@
 {
-  "name": "rolling_dice",
-  "version": "0.0.0",
-  "description": "Rolling_dice",
-  "main": "app.js",
-  "author": {
-    "name": ""
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "eslint": "^8.57.1",
-    "eslint-plugin-react": "^7.37.5",
-    "globals": "^16.5.0"
-  },
-  "eslintConfig": {}
+  "name": "api",
+  "version": "1.0.0",
+  "description": "学习成长记录后端",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "latest",
+    "express": "^4.17.1",
+    "serverless-express": "latest"
+  }
 }

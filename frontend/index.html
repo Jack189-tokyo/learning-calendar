@@ -2,18 +2,29 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>学习成长记录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习成长记录 - 云同步版</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+
+    <script src="https://imgcache.qq.com/qcloud/cloudbase-js-sdk/1.5.0/cloudbase.full.js"></script>
+
+    <script src="app.js" defer></script>
 </head>
 <body>
     <div class="container">
+        <div class="sync-status-bar" style="background:#f0f7ff; padding:12px; border-radius:10px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border: 1px solid #dbeafe;">
+            <div id="loginStatus" style="font-size:14px; color:#1e40af; font-weight:bold;">正在初始化云服务...</div>
+            <button id="syncCloudBtn" style="display:none; background:#3b82f6; padding:6px 12px; font-size:12px; color:white; border:none; border-radius:4px; cursor:pointer;">☁️ 手动同步</button>
+        </div>
+
         <header class="header">
             <h1>学习成长记录</h1>
             <div class="controls-row">
                 <div class="month-nav">
                     <button id="prevMonthBtn">← 上一月</button>
-                    <div id="currentMonthLabel"></div>
+                    <div id="currentMonthLabel" style="font-weight:bold; margin:0 15px;"></div>
                     <button id="nextMonthBtn">下一月 →</button>
                 </div>
                 <div class="subject-select-wrap">
@@ -27,16 +38,10 @@
             </div>
         </header>
 
-        <!-- 日历热力图 -->
         <section class="calendar-section">
             <div class="calendar-header">
-                <div class="weekday">一</div>
-                <div class="weekday">二</div>
-                <div class="weekday">三</div>
-                <div class="weekday">四</div>
-                <div class="weekday">五</div>
-                <div class="weekday">六</div>
-                <div class="weekday">日</div>
+                <div class="weekday">一</div><div class="weekday">二</div><div class="weekday">三</div>
+                <div class="weekday">四</div><div class="weekday">五</div><div class="weekday">六</div><div class="weekday">日</div>
             </div>
             <div id="calendarGrid" class="calendar-grid"></div>
             <div class="legend">
@@ -51,7 +56,6 @@
             </div>
         </section>
 
-        <!-- 数据录入 -->
         <section class="entry-section">
             <h2>当天数据录入</h2>
             <div class="date-line">
@@ -76,16 +80,13 @@
                 <button id="saveDayBtn">保存当天数据</button>
                 <button id="clearDayBtn" class="danger">清除当天数据</button>
             </div>
-            <p class="hint">提示：输入 0-100 的数值。保存后日历颜色会更新。</p>
         </section>
 
-        <!-- 柱状图 -->
         <section class="chart-section">
             <h2>当天三科正确率柱状图</h2>
             <canvas id="dayBarChart"></canvas>
         </section>
 
-        <!-- 错题本（日记格式） -->
         <section class="wrongbook-section">
             <h2>错题本（日记格式）</h2>
             <div class="date-line">
@@ -96,7 +97,7 @@
                 <button id="wrongPrevBtn">← 上一页</button>
                 <button id="wrongNextBtn">下一页 →</button>
             </div>
-            <div class="wrong-calendar" id="wrongCalendar"></div>
+            <div id="wrongCalendar" class="wrong-calendar"></div>
             <div class="wrong-entry">
                 <input type="text" id="wrongQuestionInput" placeholder="输入错题题目或描述">
                 <button id="addWrongBtn">添加到错题本</button>
@@ -107,22 +108,17 @@
             </div>
         </section>
 
-        <!-- 荣誉墙 -->
         <section class="honor-section">
             <h2>荣誉墙</h2>
             <div id="honorWall" class="honor-wall"></div>
         </section>
 
-        <!-- 导出 CSV -->
         <section class="export-section">
             <h2>数据导出</h2>
             <button id="exportCsvBtn">导出 CSV</button>
         </section>
     </div>
 
-    <!-- 奖牌浮现容器 -->
     <div id="medalPopup" class="medal-popup"></div>
-
-    <script src="app.js"></script>
 </body>
 </html>
