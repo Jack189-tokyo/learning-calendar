@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习成长记录 - Supabase 版</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="client.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <div class="status-bar">
+            <div id="loginStatus">⏳ 正在初始化 Supabase...</div>
+        </div>
+
+        <header class="header">
+            <h1>学习成长记录</h1>
+            <div class="month-nav">
+                <button id="prevMonthBtn">←</button>
+                <span id="currentMonthLabel">加载中...</span>
+                <button id="nextMonthBtn">→</button>
+            </div>
+        </header>
+
+        <div id="calendarGrid" class="calendar-grid"></div>
+
+        <section class="entry-section">
+            <h2 id="selectedDateText">请选择日期</h2>
+            <div class="input-group">
+                <div class="field">
+                    <label>数学 %</label>
+                    <input type="number" id="mathInput" placeholder="0-100">
+                </div>
+                <div class="field">
+                    <label>阅读 %</label>
+                    <input type="number" id="readingInput" placeholder="0-100">
+                </div>
+                <div class="field">
+                    <label>拼写 %</label>
+                    <input type="number" id="spellingInput" placeholder="0-100">
+                </div>
+            </div>
+            <button id="saveDayBtn" class="primary-btn">💾 保存并同步到云端</button>
+        </section>
+    </div>
+</body>
+</html>
