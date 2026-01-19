@@ -8,26 +8,40 @@ let currentYear, currentMonth, selectedDateISO, currentUser;
 let currentSubject = "math";
 let barChart;
 
-// ===== 3. 初始化入口 =====
+// 分页全局变量
+let currentPage = 1;
+const ITEMS_PER_PAGE = 6;
+
+// ===== 3. 初始化入口 (增加容错保护) =====
 window.addEventListener("DOMContentLoaded", async () => {
+    console.log("应用启动中...");
+
+    // 初始化基础数据
     initTime();
-    initBarChart();
+
+    // 初始化 UI 组件（带安全检查）
+    if (document.getElementById("dayBarChart")) initBarChart();
+    initCustomSelect();
 
     // 监听 Auth 状态变化
     sbClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-            currentUser = session?.user;
-            if (currentUser) {
-                showMainApp();
-            }
-        } else if (event === 'SIGNED_OUT') {
-            currentUser = null;
+        currentUser = session?.user;
+        if (currentUser) {
+            showMainApp();
+        } else {
             showAuthForm();
         }
     });
 
     bindEvents();
 });
+
+// 安全获取元素函数：防止因缺少 HTML 元素导致的脚本死机
+function safeGet(id) {
+    const el = document.getElementById(id);
+    if (!el) console.warn(`[页面兼容性] 未找到 ID 为 "${id}" 的元素，相关功能将静默跳过。`);
+    return el;
+}
 
 function initTime() {
     const today = new Date();
@@ -36,91 +50,71 @@ function initTime() {
     selectedDateISO = formatDate(today);
 }
 
-// ===== 4. 身份验证 (Auth) 核心函数 =====
-
+// ===== 4. 身份验证 (Auth) 函数 =====
 async function handleLogin() {
-    const email = document.getElementById("emailInput").value.trim();
-    const password = document.getElementById("passwordInput").value;
-    const msg = document.getElementById("authMsg");
+    const email = safeGet("emailInput")?.value.trim();
+    const password = safeGet("passwordInput")?.value;
+    const msg = safeGet("authMsg");
+    if (!email || !password) { if (msg) msg.textContent = "❌ 请输入邮箱和密码"; return; }
 
-    if (!email || !password) {
-        msg.textContent = "❌ 请输入邮箱和密码";
-        return;
-    }
-
-    msg.textContent = "⏳ 正在登录...";
-    // 执行登录请求
-    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-
-    if (error) {
-        console.error("Login Error:", error);
-        // 专门处理未验证邮箱的情况
-        if (error.message.includes("Email not confirmed")) {
-            msg.textContent = "❌ 请先去邮箱验证确认链接，或在后台关闭 Email Confirmation。";
-        } else {
-            msg.textContent = "❌ 登录失败: " + error.message;
-        }
-        msg.style.color = "#dc2626";
-    } else {
-        currentUser = data.user;
-        msg.textContent = "✅ 登录成功！";
-        msg.style.color = "#059669";
-        showMainApp(); // 确保界面切换
+    if (msg) msg.textContent = "⏳ 正在登录...";
+    const { error } = await sbClient.auth.signInWithPassword({ email, password });
+    if (error && msg) {
+        msg.textContent = "❌ " + error.message;
     }
 }
 
 async function handleRegister() {
-    const email = document.getElementById("regEmailInput").value.trim();
-    const password = document.getElementById("regPasswordInput").value;
-    const msg = document.getElementById("authMsg");
-
-    if (!email || password.length < 6) {
-        msg.textContent = "❌ 邮箱无效或密码太短（最少6位）";
+    const email = safeGet("regEmailInput")?.value.trim();
+    const password = safeGet("regPasswordInput")?.value;
+    const msg = safeGet("authMsg");
+    if (!email || !password || password.length < 6) {
+        if (msg) msg.textContent = "❌ 邮箱无效或密码太短 (至少6位)";
         return;
     }
 
-    const { data, error } = await sbClient.auth.signUp({ email, password });
-    if (error) {
-        msg.textContent = "❌ 注册失败: " + error.message;
-        msg.style.color = "#dc2626";
-    } else {
-        msg.textContent = "✅ 注册成功！请登录（若需验证请查收邮件）。";
-        msg.style.color = "#059669";
-    }
+    const { error } = await sbClient.auth.signUp({ email, password });
+    if (msg) msg.textContent = error ? "❌ " + error.message : "✅ 注册成功！直接登录即可。";
 }
 
 async function handleLogout() {
-    const { error } = await sbClient.auth.signOut();
-    if (!error) {
-        localStorage.clear();
-        location.reload();
-    }
+    await sbClient.auth.signOut();
+    localStorage.clear();
+    location.reload();
 }
 
 function showMainApp() {
-    document.getElementById("authContainer").style.display = "none";
-    document.getElementById("appContainer").style.display = "block";
+    const auth = safeGet("authContainer");
+    const app = safeGet("appContainer");
+    if (auth) auth.style.display = "none";
+    if (app) app.style.display = "block";
     syncAllFromCloud();
 }
 
 function showAuthForm() {
-    document.getElementById("authContainer").style.display = "block";
-    document.getElementById("appContainer").style.display = "none";
+    const auth = safeGet("authContainer");
+    const app = safeGet("appContainer");
+    if (auth) auth.style.display = "block";
+    if (app) app.style.display = "none";
 }
 
 function toggleAuthMode(mode) {
-    document.getElementById("loginForm").style.display = mode === 'login' ? 'block' : 'none';
-    document.getElementById("registerForm").style.display = mode === 'reg' ? 'block' : 'none';
-    document.getElementById("showLogin").classList.toggle("active", mode === 'login');
-    document.getElementById("showRegister").classList.toggle("active", mode === 'reg');
+    const loginF = safeGet("loginForm");
+    const regF = safeGet("registerForm");
+    const btnL = safeGet("showLogin");
+    const btnR = safeGet("showRegister");
+
+    if (loginF) loginF.style.display = mode === 'login' ? 'block' : 'none';
+    if (regF) regF.style.display = mode === 'reg' ? 'block' : 'none';
+    if (btnL) btnL.classList.toggle("active", mode === 'login');
+    if (btnR) btnR.classList.toggle("active", mode === 'reg');
 }
 
-// ===== 5. 云端同步 =====
-
+// ===== 5. 云端数据同步 =====
 async function syncAllFromCloud() {
     if (!currentUser) return;
-    const statusEl = document.getElementById("loginStatus");
-    statusEl.textContent = "⏳ 同步中...";
+    const statusEl = safeGet("loginStatus");
+    if (statusEl) statusEl.textContent = "⏳ 同步中...";
 
     try {
         const [recordsRes, wrongsRes, honorsRes] = await Promise.all([
@@ -131,92 +125,71 @@ async function syncAllFromCloud() {
 
         if (recordsRes.data) {
             const hist = {};
-            recordsRes.data.forEach(r => {
-                hist[r.date] = { math: r.math, reading: r.reading, spelling: r.spelling };
-            });
+            recordsRes.data.forEach(r => { hist[r.date] = { math: r.math, reading: r.reading, spelling: r.spelling }; });
             setHistory(hist);
         }
-
         if (wrongsRes.data) {
             const wb = {};
-            wrongsRes.data.forEach(w => {
-                if (!wb[w.date]) wb[w.date] = [];
-                wb[w.date].push(w.content);
-            });
+            wrongsRes.data.forEach(w => { if (!wb[w.date]) wb[w.date] = []; wb[w.date].push(w.content); });
             setWrongBook(wb);
         }
-
         if (honorsRes.data) {
             const hw = honorsRes.data.map(h => ({ date: h.date, medal: h.medal }));
             localStorage.setItem("honorWall", JSON.stringify(hw));
         }
 
-        refreshUI();
-        statusEl.textContent = `👤 ${currentUser.email}`;
+        setSelected(selectedDateISO);
+        if (statusEl) statusEl.textContent = `👤 ${currentUser.email}`;
     } catch (e) {
         console.error("同步出错:", e);
     }
 }
 
-// ===== 6. 核心业务逻辑 =====
+// ===== 6. 自定义下拉菜单核心逻辑 =====
+function initCustomSelect() {
+    const trigger = safeGet('selectTrigger');
+    const optionsContainer = safeGet('customOptions');
+    const optionItems = document.querySelectorAll('.custom-option');
+    const selectedText = safeGet('selectedOptionText');
 
-async function saveDayData() {
-    const mathVal = clamp01(document.getElementById("mathInput").value);
-    const readingVal = clamp01(document.getElementById("readingInput").value);
-    const spellingVal = clamp01(document.getElementById("spellingInput").value);
+    if (!trigger || !optionsContainer) return;
 
-    const hist = getHistory();
-    hist[selectedDateISO] = { math: mathVal, reading: readingVal, spelling: spellingVal };
-    setHistory(hist);
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        optionsContainer.classList.toggle('show');
+    });
 
-    if (currentUser) {
-        await sbClient.from('learning_records').upsert({
-            user_id: currentUser.id,
-            date: selectedDateISO,
-            math: mathVal, reading: readingVal, spelling: spellingVal
+    optionItems.forEach(item => {
+        item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const val = this.getAttribute('data-value');
+            const text = this.innerText;
+
+            currentSubject = val;
+            if (selectedText) selectedText.innerText = text;
+
+            optionItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+
+            optionsContainer.classList.remove('show');
+            renderCalendarGrid();
         });
-    }
-    refreshUI();
-    checkMedalForDay();
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!trigger.contains(e.target)) {
+            optionsContainer.classList.remove('show');
+        }
+    });
 }
 
-async function addWrongToBook() {
-    const input = document.getElementById("wrongQuestionInput");
-    const val = (input.value || "").trim();
-    if (!val) return;
-
-    const wb = getWrongBook();
-    wb[selectedDateISO] = wb[selectedDateISO] || [];
-    wb[selectedDateISO].push(val);
-    setWrongBook(wb);
-
-    if (currentUser) {
-        await sbClient.from('wrong_book').insert({
-            user_id: currentUser.id,
-            date: selectedDateISO,
-            content: val
-        });
-    }
-    input.value = "";
-    refreshUI();
-}
-
-function refreshUI() {
-    renderCalendarGrid();
-    renderBarForSelectedDay();
-    renderWrongListForSelectedDay();
-    renderWrongCalendar(); // 这个函数现在已经在下面定义了！
-    renderHonorWall();
-}
-
-// ===== 7. 渲染函数汇总 =====
-
+// ===== 7. 渲染函数汇总 (包含美化适配) =====
 function renderCalendarGrid() {
-    const grid = document.getElementById("calendarGrid");
-    const label = document.getElementById("currentMonthLabel");
+    const grid = safeGet("calendarGrid");
+    const label = safeGet("currentMonthLabel");
     if (!grid) return;
     grid.innerHTML = "";
-    label.textContent = `${currentYear}年${currentMonth + 1}月`;
+    if (label) label.textContent = `${currentYear}年${currentMonth + 1}月`;
 
     const hist = getHistory();
     const offset = firstDayOffset(currentYear, currentMonth);
@@ -238,7 +211,7 @@ function renderCalendarGrid() {
         const data = hist[dateISO];
         const acc = data ? data[currentSubject] : null;
         dayCell.style.background = colorForAccuracy(acc);
-        dayCell.onclick = () => setSelected(dateISO);
+        dayCell.addEventListener('click', () => setSelected(dateISO));
 
         const num = document.createElement("div");
         num.className = "day-number";
@@ -256,10 +229,23 @@ function renderBarForSelectedDay() {
     }
 }
 
+// 错题列表美化：匹配 CSS 中的 .wrong-item 和 .delete-btn
 function renderWrongListForSelectedDay() {
-    const list = document.getElementById("wrongList");
+    const list = safeGet("wrongList");
+    if (!list) return;
     const arr = getWrongBook()[selectedDateISO] || [];
-    list.innerHTML = arr.map((q, i) => `<li><span>${q}</span><button onclick="deleteWrong(${i}, '${q}')">删除</button></li>`).join("");
+
+    if (arr.length === 0) {
+        list.innerHTML = `<li style="color:#ccc; font-size:12px; text-align:center; padding:10px;">本日无错题记录</li>`;
+        return;
+    }
+
+    list.innerHTML = arr.map((q, i) => `
+        <li class="wrong-item">
+            <span class="wrong-text">${q}</span>
+            <button class="delete-btn" onclick="deleteWrong(${i}, '${q}')">删除</button>
+        </li>
+    `).join("");
 }
 
 async function deleteWrong(index, content) {
@@ -267,35 +253,85 @@ async function deleteWrong(index, content) {
     wb[selectedDateISO].splice(index, 1);
     setWrongBook(wb);
     if (currentUser) {
-        await sbClient.from('wrong_book').delete().match({ user_id: currentUser.id, date: selectedDateISO, content: content });
+        await sbClient.from('wrong_book').delete().match({
+            user_id: currentUser.id,
+            date: selectedDateISO,
+            content: content
+        });
     }
     refreshUI();
 }
 
-// 补齐这个函数，解决 ReferenceError！
+// 历史日期胶囊美化：匹配 CSS 中的 .history-date-badge
 function renderWrongCalendar() {
     const wb = getWrongBook();
-    const container = document.getElementById("wrongCalendar");
+    const container = safeGet("wrongCalendar");
     if (!container) return;
-    const dates = Object.keys(wb).filter(d => wb[d].length > 0).sort();
-    container.innerHTML = dates.map(d => `<button class="wrong-date-btn has-wrong" onclick="setSelected('${d}')">${d}</button>`).join("");
+    const dates = Object.keys(wb).filter(d => wb[d].length > 0).sort().reverse(); // 最近的在前
+
+    container.innerHTML = dates.map(d => `
+        <button class="history-date-badge" onclick="setSelected('${d}')">${d}</button>
+    `).join("");
 }
 
 function renderHonorWall() {
-    const honor = JSON.parse(localStorage.getItem("honorWall") || "[]");
-    document.getElementById("honorWall").innerHTML = honor.map(item => `<div class="honor-item">${item.date} ${item.medal}</div>`).join("");
+    const allHonors = JSON.parse(localStorage.getItem("honorWall") || "[]");
+
+    // 统计看板
+    const stats = { gold: 0, silver: 0, bronze: 0 };
+    allHonors.forEach(item => {
+        if (item.medal.includes("金牌")) stats.gold++;
+        else if (item.medal.includes("银牌")) stats.silver++;
+        else if (item.medal.includes("铜牌")) stats.bronze++;
+    });
+
+    if (safeGet("goldCount")) safeGet("goldCount").textContent = stats.gold;
+    if (safeGet("silverCount")) safeGet("silverCount").textContent = stats.silver;
+    if (safeGet("bronzeCount")) safeGet("bronzeCount").textContent = stats.bronze;
+
+    // 分页
+    const sortedHonors = allHonors.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const totalPages = Math.max(1, Math.ceil(sortedHonors.length / ITEMS_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const pagedHonors = sortedHonors.slice(start, start + ITEMS_PER_PAGE);
+
+    const container = safeGet("honorWall");
+    if (!container) return;
+
+    if (pagedHonors.length === 0) {
+        container.innerHTML = `<div style="grid-column: span 2; color:#ccc; text-align:center; padding:20px;">暂无勋章</div>`;
+    } else {
+        container.innerHTML = pagedHonors.map(item => `
+            <div class="honor-item">
+                <span style="font-size: 11px; color: #8a87b8;">${item.date}</span>
+                <div style="font-size: 15px; margin-top:5px; font-weight:bold;">${item.medal}</div>
+            </div>
+        `).join("");
+    }
+
+    if (safeGet("pageIndicator")) safeGet("pageIndicator").textContent = `第 ${currentPage} / ${totalPages} 页`;
+    if (safeGet("prevPageBtn")) safeGet("prevPageBtn").disabled = (currentPage === 1);
+    if (safeGet("nextPageBtn")) safeGet("nextPageBtn").disabled = (currentPage === totalPages);
 }
 
-// ===== 8. 工具与事件 =====
-
+// ===== 8. 工具函数 =====
 function getHistory() { return JSON.parse(localStorage.getItem("accuracyHistory") || "{}"); }
 function setHistory(hist) { localStorage.setItem("accuracyHistory", JSON.stringify(hist)); }
 function getWrongBook() { return JSON.parse(localStorage.getItem("wrongBook") || "{}"); }
 function setWrongBook(wb) { localStorage.setItem("wrongBook", JSON.stringify(wb)); }
-function formatDate(date) { return date.toISOString().split('T')[0]; }
+
+function formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 function clamp01(v) { return v === "" ? null : Math.min(100, Math.max(0, Number(v))); }
 function colorForAccuracy(acc) {
-    if (acc === null) return "#e5e7eb";
+    if (acc === null) return "#f3f4f6";
     if (acc < 60) return "#ef4444";
     if (acc < 90) return "#84cc16";
     return "#166534";
@@ -304,46 +340,127 @@ function firstDayOffset(y, m) { const d = new Date(y, m, 1).getDay(); return d =
 
 function setSelected(iso) {
     selectedDateISO = iso;
-    const [y, m] = iso.split("-").map(Number);
-    currentYear = y; currentMonth = m - 1;
-    document.getElementById("selectedDateText").textContent = iso;
-    document.getElementById("wrongDateText").textContent = iso;
+    const parts = iso.split("-");
+    currentYear = parseInt(parts[0]);
+    currentMonth = parseInt(parts[1]) - 1;
+
+    const dateTxt = safeGet("selectedDateText");
+    if (dateTxt) dateTxt.textContent = iso;
+
     const data = getHistory()[iso] || {};
-    document.getElementById("mathInput").value = data.math ?? "";
-    document.getElementById("readingInput").value = data.reading ?? "";
-    document.getElementById("spellingInput").value = data.spelling ?? "";
+    if (safeGet("mathInput")) safeGet("mathInput").value = data.math ?? "";
+    if (safeGet("readingInput")) safeGet("readingInput").value = data.reading ?? "";
+    if (safeGet("spellingInput")) safeGet("spellingInput").value = data.spelling ?? "";
+
+    refreshUI();
+}
+
+function refreshUI() {
+    renderCalendarGrid();
+    renderBarForSelectedDay();
+    renderWrongListForSelectedDay();
+    renderWrongCalendar();
+    renderHonorWall();
+}
+
+async function saveDayData() {
+    const mathVal = clamp01(safeGet("mathInput")?.value);
+    const readingVal = clamp01(safeGet("readingInput")?.value);
+    const spellingVal = clamp01(safeGet("spellingInput")?.value);
+
+    const hist = getHistory();
+    hist[selectedDateISO] = { math: mathVal, reading: readingVal, spelling: spellingVal };
+    setHistory(hist);
+
+    if (currentUser) {
+        await sbClient.from('learning_records').upsert({
+            user_id: currentUser.id, date: selectedDateISO,
+            math: mathVal, reading: readingVal, spelling: spellingVal
+        });
+    }
+    if (document.activeElement) document.activeElement.blur();
+    refreshUI();
+    checkMedalForDay();
+}
+
+async function addWrongToBook() {
+    const input = safeGet("wrongQuestionInput");
+    const val = (input?.value || "").trim();
+    if (!val) return;
+    const wb = getWrongBook();
+    wb[selectedDateISO] = wb[selectedDateISO] || [];
+    wb[selectedDateISO].push(val);
+    setWrongBook(wb);
+    if (currentUser) {
+        await sbClient.from('wrong_book').insert({ user_id: currentUser.id, date: selectedDateISO, content: val });
+    }
+    if (input) input.value = "";
+    if (document.activeElement) document.activeElement.blur();
     refreshUI();
 }
 
 function bindEvents() {
-    document.getElementById("showLogin").onclick = () => toggleAuthMode('login');
-    document.getElementById("showRegister").onclick = () => toggleAuthMode('reg');
-    document.getElementById("prevMonthBtn").onclick = () => { if (--currentMonth < 0) { currentMonth = 11; currentYear--; } renderCalendarGrid(); };
-    document.getElementById("nextMonthBtn").onclick = () => { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } renderCalendarGrid(); };
-    document.getElementById("saveDayBtn").onclick = saveDayData;
-    document.getElementById("addWrongBtn").onclick = addWrongToBook;
-    document.getElementById("subjectSelect").onchange = (e) => { currentSubject = e.target.value; renderCalendarGrid(); };
+    // 身份切换
+    const btnL = safeGet("showLogin");
+    const btnR = safeGet("showRegister");
+    if (btnL) btnL.onclick = () => toggleAuthMode('login');
+    if (btnR) btnR.onclick = () => toggleAuthMode('reg');
+
+    // 月份切换
+    const prevM = safeGet("prevMonthBtn");
+    const nextM = safeGet("nextMonthBtn");
+    if (prevM) prevM.onclick = (e) => {
+        e.stopPropagation();
+        if (--currentMonth < 0) { currentMonth = 11; currentYear--; }
+        renderCalendarGrid();
+    };
+    if (nextM) nextM.onclick = (e) => {
+        e.stopPropagation();
+        if (++currentMonth > 11) { currentMonth = 0; currentYear++; }
+        renderCalendarGrid();
+    };
+
+    // 分页点击
+    const prevP = safeGet("prevPageBtn");
+    const nextP = safeGet("nextPageBtn");
+    if (prevP) prevP.onclick = () => { if (currentPage > 1) { currentPage--; renderHonorWall(); } };
+    if (nextP) nextP.onclick = () => {
+        const allHonors = JSON.parse(localStorage.getItem("honorWall") || "[]");
+        const totalPages = Math.ceil(allHonors.length / ITEMS_PER_PAGE);
+        if (currentPage < totalPages) { currentPage++; renderHonorWall(); }
+    };
+
+    // 功能按钮
+    const saveBtn = safeGet("saveDayBtn");
+    const addWBtn = safeGet("addWrongBtn");
+    if (saveBtn) saveBtn.onclick = saveDayData;
+    if (addWBtn) addWBtn.onclick = addWrongToBook;
 }
 
 function initBarChart() {
-    const ctx = document.getElementById("dayBarChart").getContext("2d");
+    const canvas = safeGet("dayBarChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
     barChart = new Chart(ctx, {
         type: "bar",
-        data: { labels: ["数学", "阅读", "拼写"], datasets: [{ label: "正确率%", data: [0, 0, 0], backgroundColor: ["#93c5fd", "#bbf7d0", "#fde68a"] }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+        data: { labels: ["数学", "阅读", "拼写"], datasets: [{ label: "正确率%", data: [0, 0, 0], backgroundColor: ["#7b68ee", "#84cc16", "#fde68a"] }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
     });
 }
 
 function checkMedalForDay() {
     const day = getHistory()[selectedDateISO] || {};
-    const scores = [day.math, day.reading, day.spelling].filter(v => v !== null);
+    const scores = [day.math, day.reading, day.spelling].filter(v => v !== null && v !== undefined);
     if (scores.length < 3) return;
     const count90 = scores.filter(v => v >= 90).length;
     let medal = count90 === 3 ? "🥇 金牌" : count90 === 2 ? "🥈 银牌" : count90 === 1 ? "🥉 铜牌" : null;
     if (medal) {
-        const popup = document.getElementById("medalPopup");
-        popup.textContent = medal; popup.style.display = "block";
-        setTimeout(() => popup.style.display = "none", 3000);
+        const popup = safeGet("medalPopup");
+        if (popup) {
+            popup.textContent = `恭喜获得 ${medal}!`;
+            popup.style.display = "block";
+            setTimeout(() => popup.style.display = "none", 3000);
+        }
         addMedalToHonorWall(selectedDateISO, medal);
     }
 }

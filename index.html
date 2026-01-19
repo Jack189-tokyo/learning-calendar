@@ -1,142 +1,158 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>学习成长记录 - 用户版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>学习进度追踪 - 荣誉版</title>
     <link rel="stylesheet" href="style.css">
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script src="client.js" defer></script>
 </head>
 <body>
 
-    <div id="authContainer" class="auth-box">
-        <div class="auth-card">
-            <h2>🚀 学习记录系统</h2>
-            <p class="auth-subtitle">请登录以同步您的云端错题本</p>
+    <div id="authContainer" class="container">
+        <div class="auth-box">
+            <div class="auth-card">
+                <h2 style="margin-bottom: 20px;">欢迎回来</h2>
+                <div class="auth-tabs">
+                    <button id="showLogin" class="active">登录</button>
+                    <button id="showRegister">注册</button>
+                </div>
 
-            <div class="auth-tabs">
-                <button id="showLogin" class="active">登录</button>
-                <button id="showRegister">注册</button>
+                <div id="loginForm">
+                    <div class="input-group">
+                        <input type="email" id="emailInput" placeholder="电子邮箱">
+                        <input type="password" id="passwordInput" placeholder="密码">
+                    </div>
+                    <button class="primary-btn" onclick="handleLogin()">立即登录</button>
+                </div>
+
+                <div id="registerForm" style="display: none;">
+                    <div class="input-group">
+                        <input type="email" id="regEmailInput" placeholder="设置邮箱">
+                        <input type="password" id="regPasswordInput" placeholder="设置密码 (至少6位)">
+                    </div>
+                    <button class="primary-btn" onclick="handleRegister()">创建账号</button>
+                </div>
+
+                <p id="authMsg" style="margin-top: 15px; font-size: 14px; color: #ff4d4f; min-height: 20px;"></p>
             </div>
-
-            <div id="loginForm">
-                <div class="input-group">
-                    <input type="email" id="emailInput" placeholder="电子邮箱" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="passwordInput" placeholder="密码" required>
-                </div>
-                <button onclick="handleLogin()" class="primary-btn full-width">登录系统</button>
-            </div>
-
-            <div id="registerForm" style="display:none;">
-                <div class="input-group">
-                    <input type="email" id="regEmailInput" placeholder="设置电子邮箱" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="regPasswordInput" placeholder="设置密码 (至少6位)" required>
-                </div>
-                <button onclick="handleRegister()" class="secondary full-width">创建账户</button>
-            </div>
-
-            <p id="authMsg" class="auth-msg"></p>
         </div>
     </div>
 
     <div id="appContainer" class="container" style="display: none;">
 
         <div class="status-bar">
-            <span id="loginStatus">👤 正在加载用户信息...</span>
-            <button onclick="handleLogout()" class="text-btn">退出登录退出</button>
+            <span id="loginStatus">同步中...</span>
+            <button class="text-btn" onclick="handleLogout()">退出登录</button>
         </div>
-
-        <header class="header">
-            <h1>我的学习成长日历</h1>
-            <div class="controls-row">
-                <div class="month-nav">
-                    <button id="prevMonthBtn">←</button>
-                    <div id="currentMonthLabel">2024年1月</div>
-                    <button id="nextMonthBtn">→</button>
-                </div>
-                <div class="subject-select-wrap">
-                    <select id="subjectSelect">
-                        <option value="math">数学热力图</option>
-                        <option value="reading">阅读热力图</option>
-                        <option value="spelling">拼写热力图</option>
-                    </select>
-                </div>
-            </div>
-        </header>
 
         <section class="calendar-section">
-            <div class="calendar-header">
-                <div class="weekday">一</div><div class="weekday">二</div><div class="weekday">三</div>
-                <div class="weekday">四</div><div class="weekday">五</div><div class="weekday">六</div>
-                <div class="weekday">日</div>
-            </div>
-            <div id="calendarGrid" class="calendar-grid"></div>
-            <div class="legend">
-                <span>低正确率</span>
-                <span class="legend-box" style="background: #ef4444;"></span>
-                <span class="legend-box" style="background: #e5e7eb;"></span>
-                <span class="legend-box" style="background: #84cc16;"></span>
-                <span class="legend-box" style="background: #166534;"></span>
-                <span>高正确率</span>
-            </div>
-        </section>
+            <div class="calendar-controls">
+                <div class="month-controls">
+                    <button id="prevMonthBtn" class="nav-btn">
+                        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
+                    </button>
+                    <h2 id="currentMonthLabel">2026年1月</h2>
+                    <button id="nextMonthBtn" class="nav-btn">
+                        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" /></svg>
+                    </button>
+                </div>
 
-        <div class="main-grid">
-            <section class="entry-section">
-                <h2>当天数据: <span id="selectedDateText">—</span></h2>
-                <div class="entry-grid">
-                    <div class="entry-item">
-                        <label>数学 (%)</label>
-                        <input type="number" id="mathInput" min="0" max="100">
+                <div class="subject-select-wrap">
+                    <div class="custom-select-trigger" id="selectTrigger">
+                        <span id="selectedOptionText">数学热力图</span>
+                        <span style="font-size: 10px; margin-left: 5px;">▼</span>
                     </div>
-                    <div class="entry-item">
-                        <label>阅读 (%)</label>
-                        <input type="number" id="readingInput" min="0" max="100">
-                    </div>
-                    <div class="entry-item">
-                        <label>拼写 (%)</label>
-                        <input type="number" id="spellingInput" min="0" max="100">
+                    <div class="custom-options" id="customOptions">
+                        <div class="custom-option active" data-value="math">数学热力图</div>
+                        <div class="custom-option" data-value="reading">阅读热力图</div>
+                        <div class="custom-option" data-value="spelling">拼写热力图</div>
                     </div>
                 </div>
-                <button id="saveDayBtn" class="primary-btn full-width" style="margin-top: 15px;">💾 保存并同步</button>
-            </section>
+            </div>
 
-            <section class="chart-section">
+            <div class="calendar-header">
+                <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+
+            <div class="legend">
+                <span style="margin-right: 5px;">低正确率</span>
+                <div class="legend-box" style="background: #ef4444;"></div>
+                <div class="legend-box" style="background: #f3f4f6;"></div>
+                <div class="legend-box" style="background: #84cc16;"></div>
+                <div class="legend-box" style="background: #166534;"></div>
+                <span style="margin-left: 5px;">高正确率</span>
+            </div>
+        </section>
+
+        <section>
+            <h3 style="margin-bottom: 15px;">当日数据: <span id="selectedDateText"></span></h3>
+            <div class="entry-grid">
+                <div class="entry-item">
+                    <label>数学 %</label>
+                    <input type="number" id="mathInput" placeholder="0-100" min="0" max="100">
+                </div>
+                <div class="entry-item">
+                    <label>阅读 %</label>
+                    <input type="number" id="readingInput" placeholder="0-100" min="0" max="100">
+                </div>
+                <div class="entry-item">
+                    <label>拼写 %</label>
+                    <input type="number" id="spellingInput" placeholder="0-100" min="0" max="100">
+                </div>
+            </div>
+            <button class="primary-btn" id="saveDayBtn">保存今日记录</button>
+            <div id="medalPopup" style="display:none; text-align:center; margin-top:10px; font-weight:bold; color:#7b68ee; border: 2px solid #7b68ee; border-radius: 12px; padding: 10px;"></div>
+        </section>
+
+        <section>
+            <h3 style="margin-bottom: 10px;">成绩分布图</h3>
+            <div style="position: relative; height: 200px; width: 100%;">
                 <canvas id="dayBarChart"></canvas>
-            </section>
+            </div>
+        </section>
+
+        <section>
+            <h3>错题记录</h3>
+            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                <input type="text" id="wrongQuestionInput" placeholder="输入错题描述..." style="flex:1; padding:12px; border-radius:12px; border:2px solid #eeecff; outline:none;">
+                <button class="primary-btn" id="addWrongBtn" style="width: 80px;">添加</button>
+            </div>
+            <ul id="wrongList" style="list-style: none;">
+            </ul>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #f0f0f5;">
+            <h4>历史错题分布</h4>
+            <div id="wrongCalendar" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+            </div>
+        </section>
+
+        <section>
+            <h3 style="margin-bottom: 15px;">🏆 勋章荣誉墙</h3>
+
+            <div class="medal-stats-bar">
+                <div class="stat-item">🥇 金牌: <span id="goldCount">0</span></div>
+                <div class="stat-item">🥈 银牌: <span id="silverCount">0</span></div>
+                <div class="stat-item">🥉 铜牌: <span id="bronzeCount">0</span></div>
+            </div>
+
+            <div id="honorWall" class="honor-grid">
+            </div>
+
+            <div class="pagination-controls">
+                <button id="prevPageBtn" class="page-btn" disabled>上一页</button>
+                <span id="pageIndicator">第 1 / 1 页</span>
+                <button id="nextPageBtn" class="page-btn" disabled>下一页</button>
+            </div>
+        </section>
+
+        <div class="footer-actions" style="text-align: center; margin-top: 10px;">
+            <button class="text-btn">导出我的学习周报 (PDF预览)</button>
         </div>
-
-        <section class="wrongbook-section">
-            <h2>错题本回顾</h2>
-            <div id="wrongCalendar" class="wrong-calendar">
-            </div>
-            <div class="wrong-entry">
-                <input type="text" id="wrongQuestionInput" placeholder="记录一道错题或薄弱知识点...">
-                <button id="addWrongBtn">添加</button>
-            </div>
-            <div class="date-subtitle">📅 <span id="wrongDateText">—</span> 的错题清单：</div>
-            <ul id="wrongList" class="wrong-list"></ul>
-        </section>
-
-        <section class="honor-section">
-            <h2>成就荣誉墙</h2>
-            <div id="honorWall" class="honor-wall"></div>
-        </section>
-
-        <footer class="footer-actions">
-            <button id="exportCsvBtn" class="secondary">📥 导出数据备份 (CSV)</button>
-        </footer>
     </div>
 
-    <div id="medalPopup" class="medal-popup" style="display:none;"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="client.js"></script>
 
 </body>
 </html>
