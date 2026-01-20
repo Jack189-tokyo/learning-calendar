@@ -77,28 +77,24 @@
 
             <div class="legend">
                 <span style="margin-right: 5px;">低正确率</span>
-                <div class="legend-box" style="background: #ef4444;"></div>
-                <div class="legend-box" style="background: #f3f4f6;"></div>
-                <div class="legend-box" style="background: #84cc16;"></div>
-                <div class="legend-box" style="background: #166534;"></div>
-                <span style="margin-left: 5px;">高正确率</span>
+                <div class="legend-box lv1"></div> <div class="legend-box lv2"></div> <div class="legend-box lv3"></div> <div class="legend-box lv4"></div> <span style="margin-left: 5px;">高正确率</span>
             </div>
         </section>
 
         <section>
             <h3 style="margin-bottom: 15px;">当日数据: <span id="selectedDateText"></span></h3>
-            <div class="entry-grid">
+            <div class="entry-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
                 <div class="entry-item">
-                    <label>数学 %</label>
-                    <input type="number" id="mathInput" placeholder="0-100" min="0" max="100">
+                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">数学 %</label>
+                    <input type="number" id="mathInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label>阅读 %</label>
-                    <input type="number" id="readingInput" placeholder="0-100" min="0" max="100">
+                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">阅读 %</label>
+                    <input type="number" id="readingInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label>拼写 %</label>
-                    <input type="number" id="spellingInput" placeholder="0-100" min="0" max="100">
+                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">拼写 %</label>
+                    <input type="number" id="spellingInput" placeholder="0-100">
                 </div>
             </div>
             <button class="primary-btn" id="saveDayBtn">保存今日记录</button>
@@ -107,7 +103,7 @@
 
         <section>
             <h3 style="margin-bottom: 10px;">成绩分布图</h3>
-            <div style="position: relative; height: 200px; width: 100%;">
+            <div style="position: relative; height: 180px; width: 100%;">
                 <canvas id="dayBarChart"></canvas>
             </div>
         </section>
@@ -115,29 +111,28 @@
         <section>
             <h3>错题记录</h3>
             <div style="display: flex; gap: 10px; margin: 15px 0;">
-                <input type="text" id="wrongQuestionInput" placeholder="输入错题描述..." style="flex:1; padding:12px; border-radius:12px; border:2px solid #eeecff; outline:none;">
-                <button class="primary-btn" id="addWrongBtn" style="width: 80px;">添加</button>
+                <input type="text" id="wrongQuestionInput" placeholder="输入错题描述..." style="flex:1;">
+                <button class="primary-btn" id="addWrongBtn" style="width: 80px; margin-top: 0;">添加</button>
             </div>
-            <ul id="wrongList" style="list-style: none;">
+
+            <ul id="wrongList" style="list-style: none; margin-bottom: 20px;">
             </ul>
+
             <hr style="margin: 20px 0; border: none; border-top: 1px solid #f0f0f5;">
-            <h4>历史错题分布</h4>
-            <div id="wrongCalendar" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+
+            <h4>历史错题日期 (左右滑动)</h4>
+            <div id="wrongCalendar">
             </div>
         </section>
 
         <section>
             <h3 style="margin-bottom: 15px;">🏆 勋章荣誉墙</h3>
-
             <div class="medal-stats-bar">
                 <div class="stat-item">🥇 金牌: <span id="goldCount">0</span></div>
                 <div class="stat-item">🥈 银牌: <span id="silverCount">0</span></div>
                 <div class="stat-item">🥉 铜牌: <span id="bronzeCount">0</span></div>
             </div>
-
-            <div id="honorWall" class="honor-grid">
-            </div>
-
+            <div id="honorWall" class="honor-grid"></div>
             <div class="pagination-controls">
                 <button id="prevPageBtn" class="page-btn" disabled>上一页</button>
                 <span id="pageIndicator">第 1 / 1 页</span>

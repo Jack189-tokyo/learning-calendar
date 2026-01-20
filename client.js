@@ -12,14 +12,12 @@ let barChart;
 let currentPage = 1;
 const ITEMS_PER_PAGE = 6;
 
-// ===== 3. 初始化入口 (增加容错保护) =====
+// ===== 3. 初始化入口 =====
 window.addEventListener("DOMContentLoaded", async () => {
     console.log("应用启动中...");
 
-    // 初始化基础数据
     initTime();
 
-    // 初始化 UI 组件（带安全检查）
     if (document.getElementById("dayBarChart")) initBarChart();
     initCustomSelect();
 
@@ -36,10 +34,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
 });
 
-// 安全获取元素函数：防止因缺少 HTML 元素导致的脚本死机
+// 安全获取元素函数
 function safeGet(id) {
     const el = document.getElementById(id);
-    if (!el) console.warn(`[页面兼容性] 未找到 ID 为 "${id}" 的元素，相关功能将静默跳过。`);
+    if (!el) console.warn(`[页面兼容性] 未找到 ID 为 "${id}" 的元素。`);
     return el;
 }
 
@@ -145,7 +143,7 @@ async function syncAllFromCloud() {
     }
 }
 
-// ===== 6. 自定义下拉菜单核心逻辑 =====
+// ===== 6. 下拉菜单逻辑 (优化字符居中与对齐交互) =====
 function initCustomSelect() {
     const trigger = safeGet('selectTrigger');
     const optionsContainer = safeGet('customOptions');
@@ -154,36 +152,38 @@ function initCustomSelect() {
 
     if (!trigger || !optionsContainer) return;
 
-    trigger.addEventListener('click', (e) => {
+    // 点击触发器
+    trigger.onclick = (e) => {
         e.stopPropagation();
-        optionsContainer.classList.toggle('show');
-    });
+        const isOpen = optionsContainer.classList.contains('show');
+        // 先关闭所有，再根据状态开启
+        document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show'));
+        if (!isOpen) optionsContainer.classList.add('show');
+    };
 
+    // 点击选项
     optionItems.forEach(item => {
-        item.addEventListener('click', function (e) {
+        item.onclick = function (e) {
             e.stopPropagation();
-            const val = this.getAttribute('data-value');
-            const text = this.innerText;
+            currentSubject = this.getAttribute('data-value');
 
-            currentSubject = val;
-            if (selectedText) selectedText.innerText = text;
-
+            // 更新文字并同步 CSS 类
+            if (selectedText) selectedText.innerText = this.innerText;
             optionItems.forEach(i => i.classList.remove('active'));
             this.classList.add('active');
 
             optionsContainer.classList.remove('show');
             renderCalendarGrid();
-        });
+        };
     });
 
-    document.addEventListener('click', (e) => {
-        if (!trigger.contains(e.target)) {
-            optionsContainer.classList.remove('show');
-        }
+    // 点击页面空白处关闭菜单
+    document.addEventListener('click', () => {
+        if (optionsContainer) optionsContainer.classList.remove('show');
     });
 }
 
-// ===== 7. 渲染函数汇总 (包含美化适配) =====
+// ===== 7. 渲染函数汇总 =====
 function renderCalendarGrid() {
     const grid = safeGet("calendarGrid");
     const label = safeGet("currentMonthLabel");
@@ -206,12 +206,16 @@ function renderCalendarGrid() {
         const dateISO = formatDate(new Date(currentYear, currentMonth, day));
         const dayCell = document.createElement("div");
         dayCell.className = "day-cell";
-        if (dateISO === selectedDateISO) dayCell.classList.add("selected");
 
         const data = hist[dateISO];
         const acc = data ? data[currentSubject] : null;
-        dayCell.style.background = colorForAccuracy(acc);
-        dayCell.addEventListener('click', () => setSelected(dateISO));
+
+        // 应用颜色阶梯
+        dayCell.classList.add(levelClassForAccuracy(acc));
+
+        if (dateISO === selectedDateISO) dayCell.classList.add("selected");
+
+        dayCell.onclick = () => setSelected(dateISO);
 
         const num = document.createElement("div");
         num.className = "day-number";
@@ -229,7 +233,6 @@ function renderBarForSelectedDay() {
     }
 }
 
-// 错题列表美化：匹配 CSS 中的 .wrong-item 和 .delete-btn
 function renderWrongListForSelectedDay() {
     const list = safeGet("wrongList");
     if (!list) return;
@@ -262,12 +265,19 @@ async function deleteWrong(index, content) {
     refreshUI();
 }
 
-// 历史日期胶囊美化：匹配 CSS 中的 .history-date-badge
 function renderWrongCalendar() {
     const wb = getWrongBook();
     const container = safeGet("wrongCalendar");
     if (!container) return;
-    const dates = Object.keys(wb).filter(d => wb[d].length > 0).sort().reverse(); // 最近的在前
+
+    const dates = Object.keys(wb)
+        .filter(d => wb[d].length > 0)
+        .sort((a, b) => new Date(b) - new Date(a));
+
+    if (dates.length === 0) {
+        container.innerHTML = `<span style="color:#ccc; font-size:12px; padding:10px;">暂无历史记录</span>`;
+        return;
+    }
 
     container.innerHTML = dates.map(d => `
         <button class="history-date-badge" onclick="setSelected('${d}')">${d}</button>
@@ -276,8 +286,6 @@ function renderWrongCalendar() {
 
 function renderHonorWall() {
     const allHonors = JSON.parse(localStorage.getItem("honorWall") || "[]");
-
-    // 统计看板
     const stats = { gold: 0, silver: 0, bronze: 0 };
     allHonors.forEach(item => {
         if (item.medal.includes("金牌")) stats.gold++;
@@ -289,7 +297,6 @@ function renderHonorWall() {
     if (safeGet("silverCount")) safeGet("silverCount").textContent = stats.silver;
     if (safeGet("bronzeCount")) safeGet("bronzeCount").textContent = stats.bronze;
 
-    // 分页
     const sortedHonors = allHonors.sort((a, b) => new Date(b.date) - new Date(a.date));
     const totalPages = Math.max(1, Math.ceil(sortedHonors.length / ITEMS_PER_PAGE));
     if (currentPage > totalPages) currentPage = totalPages;
@@ -329,13 +336,23 @@ function formatDate(date) {
     return `${y}-${m}-${d}`;
 }
 
-function clamp01(v) { return v === "" ? null : Math.min(100, Math.max(0, Number(v))); }
-function colorForAccuracy(acc) {
-    if (acc === null) return "#f3f4f6";
-    if (acc < 60) return "#ef4444";
-    if (acc < 90) return "#84cc16";
-    return "#166534";
+function clamp01(v) {
+    if (v === "" || v === null) return null;
+    return Math.min(100, Math.max(0, Number(v)));
 }
+
+/**
+ * 核心逻辑：根据正确率返回 CSS 类名 (5级阶梯)
+ */
+function levelClassForAccuracy(acc) {
+    if (acc === null || acc === undefined || acc === "") return "level-0";
+    const val = Number(acc);
+    if (val < 30) return "level-1";  // 红色
+    if (val < 60) return "level-2";  // 橙黄色 (新增过渡)
+    if (val < 90) return "level-3";  // 浅绿色
+    return "level-4";                // 深绿色
+}
+
 function firstDayOffset(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
 
 function setSelected(iso) {
@@ -348,9 +365,9 @@ function setSelected(iso) {
     if (dateTxt) dateTxt.textContent = iso;
 
     const data = getHistory()[iso] || {};
-    if (safeGet("mathInput")) safeGet("mathInput").value = data.math ?? "";
-    if (safeGet("readingInput")) safeGet("readingInput").value = data.reading ?? "";
-    if (safeGet("spellingInput")) safeGet("spellingInput").value = data.spelling ?? "";
+    if (safeGet("mathInput")) safeGet("mathInput").value = (data.math !== null && data.math !== undefined) ? data.math : "";
+    if (safeGet("readingInput")) safeGet("readingInput").value = (data.reading !== null && data.reading !== undefined) ? data.reading : "";
+    if (safeGet("spellingInput")) safeGet("spellingInput").value = (data.spelling !== null && data.spelling !== undefined) ? data.spelling : "";
 
     refreshUI();
 }
@@ -361,9 +378,15 @@ function refreshUI() {
     renderWrongListForSelectedDay();
     renderWrongCalendar();
     renderHonorWall();
+
+    const wrongCal = safeGet("wrongCalendar");
+    if (wrongCal) wrongCal.scrollLeft = 0;
 }
 
 async function saveDayData() {
+    const btn = safeGet("saveDayBtn");
+    const originalText = btn ? btn.textContent : "保存今日记录";
+
     const mathVal = clamp01(safeGet("mathInput")?.value);
     const readingVal = clamp01(safeGet("readingInput")?.value);
     const spellingVal = clamp01(safeGet("spellingInput")?.value);
@@ -373,11 +396,17 @@ async function saveDayData() {
     setHistory(hist);
 
     if (currentUser) {
+        if (btn) btn.textContent = "⏳ 正在同步...";
         await sbClient.from('learning_records').upsert({
             user_id: currentUser.id, date: selectedDateISO,
             math: mathVal, reading: readingVal, spelling: spellingVal
         });
+        if (btn) {
+            btn.textContent = "✅ 保存成功";
+            setTimeout(() => { btn.textContent = originalText; }, 1500);
+        }
     }
+
     if (document.activeElement) document.activeElement.blur();
     refreshUI();
     checkMedalForDay();
@@ -400,13 +429,11 @@ async function addWrongToBook() {
 }
 
 function bindEvents() {
-    // 身份切换
     const btnL = safeGet("showLogin");
     const btnR = safeGet("showRegister");
     if (btnL) btnL.onclick = () => toggleAuthMode('login');
     if (btnR) btnR.onclick = () => toggleAuthMode('reg');
 
-    // 月份切换
     const prevM = safeGet("prevMonthBtn");
     const nextM = safeGet("nextMonthBtn");
     if (prevM) prevM.onclick = (e) => {
@@ -420,7 +447,6 @@ function bindEvents() {
         renderCalendarGrid();
     };
 
-    // 分页点击
     const prevP = safeGet("prevPageBtn");
     const nextP = safeGet("nextPageBtn");
     if (prevP) prevP.onclick = () => { if (currentPage > 1) { currentPage--; renderHonorWall(); } };
@@ -430,7 +456,6 @@ function bindEvents() {
         if (currentPage < totalPages) { currentPage++; renderHonorWall(); }
     };
 
-    // 功能按钮
     const saveBtn = safeGet("saveDayBtn");
     const addWBtn = safeGet("addWrongBtn");
     if (saveBtn) saveBtn.onclick = saveDayData;
@@ -443,8 +468,20 @@ function initBarChart() {
     const ctx = canvas.getContext("2d");
     barChart = new Chart(ctx, {
         type: "bar",
-        data: { labels: ["数学", "阅读", "拼写"], datasets: [{ label: "正确率%", data: [0, 0, 0], backgroundColor: ["#7b68ee", "#84cc16", "#fde68a"] }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+        data: {
+            labels: ["数学", "阅读", "拼写"],
+            datasets: [{
+                label: "正确率%",
+                data: [0, 0, 0],
+                backgroundColor: ["#7b68ee", "#84cc16", "#facc15"]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, max: 100 } },
+            plugins: { legend: { display: false } }
+        }
     });
 }
 
