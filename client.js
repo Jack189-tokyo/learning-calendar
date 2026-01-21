@@ -17,6 +17,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     console.log("应用启动中...");
 
     initTime();
+    // 初始化动态背景
+    initMathBackground();
 
     if (document.getElementById("dayBarChart")) initBarChart();
     initCustomSelect();
@@ -34,7 +36,69 @@ window.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
 });
 
-// 安全获取元素函数
+// ===== 4. 增强版：动态数学背景逻辑 (加入景深模糊与随机动效) =====
+function initMathBackground() {
+    const bg = document.getElementById('math-bg');
+    if (!bg) return;
+
+    const symbols = [
+        'π', 'x + y = ?', '÷', '×', '123', '½', '∑', '∞',
+        '△', '□', '∠A', 'r²', '99×9', '5+7=12', 'V=sh', 'a²+b²',
+        'y=kx+b', 'sinθ', '6÷2=3', '10%', 'S=πr²', '>', '<', '='
+    ];
+
+    const createSymbol = () => {
+        const span = document.createElement('span');
+        span.className = 'math-symbol';
+
+        // 1. 随机内容
+        span.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+
+        // 2. 随机样式参数
+        const startX = Math.random() * 100;
+        const size = Math.random() * (65 - 20) + 20; // 尺寸 20px - 65px
+        const duration = Math.random() * (30 - 20) + 20; // 较慢的浮动速度，减少视觉干扰
+        const delay = Math.random() * 5;
+        const rotate = Math.random() * 60 - 30; // 初始旋转角度
+
+        // --- 核心优化：随机模糊度 (景深效果) ---
+        // 30% 的概率产生模糊效果，模拟背景深度
+        const blurVal = Math.random() > 0.7 ? (Math.random() * 2.5) : 0;
+
+        // 3. 应用样式
+        span.style.left = `${startX}%`;
+        span.style.bottom = `-100px`; // 从屏幕下方更远处开始，避免突兀出现
+        span.style.fontSize = `${size}px`;
+        span.style.filter = `blur(${blurVal}px)`; // 应用景深模糊
+        span.style.transform = `rotate(${rotate}deg)`;
+
+        // 配合 CSS 变量：颜色使用深紫色，较低不透明度
+        span.style.color = "rgba(107, 70, 193, 0.22)";
+        span.style.fontWeight = "900";
+        span.style.fontFamily = "'Comic Sans MS', 'Chalkboard SE', 'Quicksand', sans-serif";
+
+        // 应用 CSS 动画
+        span.style.animation = `floatAnimation ${duration}s ease-in-out ${delay}s infinite`;
+
+        bg.appendChild(span);
+
+        // 4. 定期清理并重绘，保持性能
+        setTimeout(() => {
+            if (span.parentNode) {
+                span.remove();
+                createSymbol();
+            }
+        }, (duration + delay) * 1000);
+    };
+
+    // 初始生成数量调至 12-15 个
+    // 符号变大后，数量不需要太多，以免背景显得杂乱
+    for (let i = 0; i < 14; i++) {
+        setTimeout(createSymbol, i * 800);
+    }
+}
+
+// ===== 5. 安全获取元素函数 =====
 function safeGet(id) {
     const el = document.getElementById(id);
     if (!el) console.warn(`[页面兼容性] 未找到 ID 为 "${id}" 的元素。`);
@@ -48,7 +112,7 @@ function initTime() {
     selectedDateISO = formatDate(today);
 }
 
-// ===== 4. 身份验证 (Auth) 函数 =====
+// ===== 6. 身份验证 (Auth) 函数 =====
 async function handleLogin() {
     const email = safeGet("emailInput")?.value.trim();
     const password = safeGet("passwordInput")?.value;
@@ -108,7 +172,7 @@ function toggleAuthMode(mode) {
     if (btnR) btnR.classList.toggle("active", mode === 'reg');
 }
 
-// ===== 5. 云端数据同步 =====
+// ===== 7. 云端数据同步 =====
 async function syncAllFromCloud() {
     if (!currentUser) return;
     const statusEl = safeGet("loginStatus");
@@ -143,7 +207,7 @@ async function syncAllFromCloud() {
     }
 }
 
-// ===== 6. 下拉菜单逻辑 (优化字符居中与对齐交互) =====
+// ===== 8. 下拉菜单逻辑 =====
 function initCustomSelect() {
     const trigger = safeGet('selectTrigger');
     const optionsContainer = safeGet('customOptions');
@@ -152,38 +216,31 @@ function initCustomSelect() {
 
     if (!trigger || !optionsContainer) return;
 
-    // 点击触发器
     trigger.onclick = (e) => {
         e.stopPropagation();
         const isOpen = optionsContainer.classList.contains('show');
-        // 先关闭所有，再根据状态开启
         document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show'));
         if (!isOpen) optionsContainer.classList.add('show');
     };
 
-    // 点击选项
     optionItems.forEach(item => {
         item.onclick = function (e) {
             e.stopPropagation();
             currentSubject = this.getAttribute('data-value');
-
-            // 更新文字并同步 CSS 类
             if (selectedText) selectedText.innerText = this.innerText;
             optionItems.forEach(i => i.classList.remove('active'));
             this.classList.add('active');
-
             optionsContainer.classList.remove('show');
             renderCalendarGrid();
         };
     });
 
-    // 点击页面空白处关闭菜单
     document.addEventListener('click', () => {
         if (optionsContainer) optionsContainer.classList.remove('show');
     });
 }
 
-// ===== 7. 渲染函数汇总 =====
+// ===== 9. 渲染函数汇总 =====
 function renderCalendarGrid() {
     const grid = safeGet("calendarGrid");
     const label = safeGet("currentMonthLabel");
@@ -210,11 +267,8 @@ function renderCalendarGrid() {
         const data = hist[dateISO];
         const acc = data ? data[currentSubject] : null;
 
-        // 应用颜色阶梯
         dayCell.classList.add(levelClassForAccuracy(acc));
-
         if (dateISO === selectedDateISO) dayCell.classList.add("selected");
-
         dayCell.onclick = () => setSelected(dateISO);
 
         const num = document.createElement("div");
@@ -323,7 +377,7 @@ function renderHonorWall() {
     if (safeGet("nextPageBtn")) safeGet("nextPageBtn").disabled = (currentPage === totalPages);
 }
 
-// ===== 8. 工具函数 =====
+// ===== 10. 工具函数 =====
 function getHistory() { return JSON.parse(localStorage.getItem("accuracyHistory") || "{}"); }
 function setHistory(hist) { localStorage.setItem("accuracyHistory", JSON.stringify(hist)); }
 function getWrongBook() { return JSON.parse(localStorage.getItem("wrongBook") || "{}"); }
@@ -341,16 +395,13 @@ function clamp01(v) {
     return Math.min(100, Math.max(0, Number(v)));
 }
 
-/**
- * 核心逻辑：根据正确率返回 CSS 类名 (5级阶梯)
- */
 function levelClassForAccuracy(acc) {
     if (acc === null || acc === undefined || acc === "") return "level-0";
     const val = Number(acc);
-    if (val < 30) return "level-1";  // 红色
-    if (val < 60) return "level-2";  // 橙黄色 (新增过渡)
-    if (val < 90) return "level-3";  // 浅绿色
-    return "level-4";                // 深绿色
+    if (val < 30) return "level-1";
+    if (val < 60) return "level-2";
+    if (val < 90) return "level-3";
+    return "level-4";
 }
 
 function firstDayOffset(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
@@ -378,7 +429,6 @@ function refreshUI() {
     renderWrongListForSelectedDay();
     renderWrongCalendar();
     renderHonorWall();
-
     const wrongCal = safeGet("wrongCalendar");
     if (wrongCal) wrongCal.scrollLeft = 0;
 }
@@ -386,27 +436,23 @@ function refreshUI() {
 async function saveDayData() {
     const btn = safeGet("saveDayBtn");
     const originalText = btn ? btn.textContent : "保存今日记录";
-
     const mathVal = clamp01(safeGet("mathInput")?.value);
     const readingVal = clamp01(safeGet("readingInput")?.value);
     const spellingVal = clamp01(safeGet("spellingInput")?.value);
-
     const hist = getHistory();
     hist[selectedDateISO] = { math: mathVal, reading: readingVal, spelling: spellingVal };
     setHistory(hist);
-
     if (currentUser) {
         if (btn) btn.textContent = "⏳ 正在同步...";
         await sbClient.from('learning_records').upsert({
             user_id: currentUser.id, date: selectedDateISO,
             math: mathVal, reading: readingVal, spelling: spellingVal
-        });
+        }, { onConflict: 'user_id,date' });
         if (btn) {
             btn.textContent = "✅ 保存成功";
             setTimeout(() => { btn.textContent = originalText; }, 1500);
         }
     }
-
     if (document.activeElement) document.activeElement.blur();
     refreshUI();
     checkMedalForDay();
@@ -433,7 +479,6 @@ function bindEvents() {
     const btnR = safeGet("showRegister");
     if (btnL) btnL.onclick = () => toggleAuthMode('login');
     if (btnR) btnR.onclick = () => toggleAuthMode('reg');
-
     const prevM = safeGet("prevMonthBtn");
     const nextM = safeGet("nextMonthBtn");
     if (prevM) prevM.onclick = (e) => {
@@ -446,7 +491,6 @@ function bindEvents() {
         if (++currentMonth > 11) { currentMonth = 0; currentYear++; }
         renderCalendarGrid();
     };
-
     const prevP = safeGet("prevPageBtn");
     const nextP = safeGet("nextPageBtn");
     if (prevP) prevP.onclick = () => { if (currentPage > 1) { currentPage--; renderHonorWall(); } };
@@ -455,7 +499,6 @@ function bindEvents() {
         const totalPages = Math.ceil(allHonors.length / ITEMS_PER_PAGE);
         if (currentPage < totalPages) { currentPage++; renderHonorWall(); }
     };
-
     const saveBtn = safeGet("saveDayBtn");
     const addWBtn = safeGet("addWrongBtn");
     if (saveBtn) saveBtn.onclick = saveDayData;
@@ -473,13 +516,17 @@ function initBarChart() {
             datasets: [{
                 label: "正确率%",
                 data: [0, 0, 0],
-                backgroundColor: ["#7b68ee", "#84cc16", "#facc15"]
+                backgroundColor: ["#7b68ee", "#84cc16", "#facc15"],
+                borderRadius: 8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, max: 100 } },
+            scales: {
+                y: { beginAtZero: true, max: 100, grid: { color: "rgba(0,0,0,0.05)" } },
+                x: { grid: { display: false } }
+            },
             plugins: { legend: { display: false } }
         }
     });
