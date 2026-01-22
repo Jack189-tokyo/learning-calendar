@@ -3,12 +3,13 @@
     --primary-color: #7b68ee;
     --primary-light: #f0eeff;
     --bg-color: #f8f9ff;
-    --card-bg: rgba(255, 255, 255, 0.82); /* 适度透明，透出背景符号 */
+    /* 卡片采用半透明磨砂玻璃效果，能隐约看到背后的浮动符号 */
+    --card-bg: rgba(255, 255, 255, 0.85);
     --text-main: #2d2d5f;
     --text-sub: #8a87b8;
     --success: #84cc16;
     --danger: #ef4444;
-    --border-color: rgba(238, 236, 255, 0.7);
+    --border-color: rgba(123, 104, 238, 0.35);
     --shadow: 0 12px 40px rgba(123, 104, 238, 0.12);
 }
 
@@ -26,59 +27,55 @@ body {
     line-height: 1.6;
     padding: 15px;
     min-height: 100vh;
+    position: relative;
+    /* 防止背景符号飘出屏幕产生横向滚动条 */
+    overflow-x: hidden;
 }
 
-/* ===== 2. 动态数学背景 (优化后的层次感) ===== */
+/* ===== 2. 动态数学背景 (极致灵动版配套) ===== */
 #math-bg {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1; /* 确保在所有内容最底层 */
     overflow: hidden;
     background: linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%);
     pointer-events: none;
+    transform: translateZ(0); /* 开启 GPU 硬件加速 */
 }
 
 .math-symbol {
     position: absolute;
-    color: rgba(107, 70, 193, 0.22); /* 优化后的浓度 */
+    color: var(--primary-color);
     font-family: "Comic Sans MS", "Chalkboard SE", "Quicksand", sans-serif;
     font-weight: 900;
     user-select: none;
     white-space: nowrap;
-    will-change: transform;
-    /* 增加发光质感 */
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    will-change: transform, opacity;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+    display: block;
+    /* 初始透明度由 JS 覆盖，此处设为默认值 */
+    opacity: 0.15;
 }
 
-/* 改进后的飘浮动画：左右摆动、旋转、上升 */
-@keyframes floatAnimation {
+/* 核心浮动动画：对应 client.js 中的 floatSway */
+@keyframes floatSway {
     0% {
-        transform: translateY(0) translateX(0) rotate(0deg);
-        opacity: 0;
+        transform: translate(0, 0) rotate(0deg) scale(1);
     }
 
-    10% {
-        opacity: 1;
+    33% {
+        transform: translate(30px, -50px) rotate(8deg) scale(1.05);
     }
 
-    30% {
-        transform: translateY(-30vh) translateX(30px) rotate(90deg);
-    }
-
-    60% {
-        transform: translateY(-70vh) translateX(-20px) rotate(180deg);
-    }
-
-    90% {
-        opacity: 1;
+    66% {
+        transform: translate(-20px, 20px) rotate(-6deg) scale(0.95);
     }
 
     100% {
-        transform: translateY(-115vh) translateX(40px) rotate(360deg);
-        opacity: 0;
+        transform: translate(0, 0) rotate(0deg) scale(1);
     }
 }
 
@@ -86,7 +83,7 @@ body {
     max-width: 500px;
     margin: 0 auto;
     position: relative;
-    z-index: 1;
+    z-index: 1; /* 确保内容在背景符号之上 */
 }
 
 /* ===== 3. 身份验证 (Auth) 样式 ===== */
@@ -104,6 +101,7 @@ body {
     box-shadow: var(--shadow);
     width: 100%;
     text-align: center;
+    border: 2px solid var(--border-color);
 }
 
 .auth-tabs {
@@ -112,6 +110,7 @@ body {
     padding: 5px;
     border-radius: 16px;
     margin-bottom: 25px;
+    border: 1px solid var(--border-color);
 }
 
     .auth-tabs button {
@@ -186,16 +185,16 @@ input:focus {
     margin-top: 15px;
 }
 
-/* ===== 5. 主界面卡片 (增强景深感) ===== */
+/* ===== 5. 主界面卡片 (Section) ===== */
 section {
     background: var(--card-bg);
-    backdrop-filter: blur(16px); /* 强化磨砂模糊 */
+    backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-radius: 28px;
     padding: 22px;
     margin-bottom: 20px;
     box-shadow: var(--shadow);
-    border: 1px solid rgba(255, 255, 255, 0.5); /* 模拟玻璃高光边缘 */
+    border: 2px solid var(--border-color);
 }
 
 .status-bar {
@@ -230,7 +229,7 @@ section {
 
 .nav-btn {
     background: #f0f0ff;
-    border: none;
+    border: 1px solid var(--border-color);
     width: 32px;
     height: 32px;
     border-radius: 10px;
@@ -241,7 +240,7 @@ section {
     cursor: pointer;
 }
 
-/* ===== 6. 下拉菜单优化 ===== */
+/* ===== 6. 下拉菜单样式 ===== */
 .subject-select-wrap {
     position: relative;
     width: 130px;
@@ -250,7 +249,7 @@ section {
 
 .custom-select-trigger {
     background: white;
-    border: 1.5px solid var(--border-color);
+    border: 2px solid var(--border-color);
     height: 38px;
     padding: 0 12px;
     border-radius: 12px;
@@ -261,12 +260,7 @@ section {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.2s;
 }
-
-    .custom-select-trigger:hover {
-        border-color: var(--primary-color);
-    }
 
 .custom-options {
     position: absolute;
@@ -279,7 +273,7 @@ section {
     z-index: 100;
     display: none;
     overflow: hidden;
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
 }
 
     .custom-options.show {
@@ -305,15 +299,9 @@ section {
     font-size: 13px;
     color: var(--text-main);
     cursor: pointer;
-    transition: background 0.2s;
 }
 
-    .custom-option:hover {
-        background: var(--primary-light);
-        color: var(--primary-color);
-    }
-
-    .custom-option.active {
+    .custom-option:hover, .custom-option.active {
         background: var(--primary-light);
         color: var(--primary-color);
         font-weight: 700;
@@ -346,32 +334,42 @@ section {
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     background-color: #f1f3f9;
+    border: 2px solid transparent;
 }
 
+    /* 正确率等级背景色 */
     .day-cell.level-1 {
-        background-color: #ef4444;
+        background-color: #ef4444 !important;
         color: white;
     }
 
     .day-cell.level-2 {
-        background-color: #facc15;
+        background-color: #facc15 !important;
         color: #7c2d12;
     }
 
     .day-cell.level-3 {
-        background-color: #84cc16;
+        background-color: #84cc16 !important;
         color: white;
     }
 
     .day-cell.level-4 {
-        background-color: #166534;
+        background-color: #166534 !important;
         color: white;
     }
 
+    .day-cell.level-0 {
+        background-color: #f1f3f9;
+        color: var(--text-main);
+    }
+
     .day-cell.selected {
-        box-shadow: 0 0 0 3px var(--primary-color);
-        transform: scale(0.85);
-        z-index: 1;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 15px rgba(123, 104, 238, 0.3);
+        transform: scale(0.88);
+        background-color: white !important;
+        color: var(--primary-color) !important;
+        z-index: 2;
     }
 
 .legend {
@@ -413,6 +411,7 @@ section {
     gap: 10px;
     padding: 10px 5px;
     scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
     #wrongCalendar::-webkit-scrollbar {
@@ -424,7 +423,7 @@ section {
     padding: 10px 20px;
     background: white;
     border-radius: 14px;
-    border: 1.5px solid var(--border-color);
+    border: 2px solid var(--border-color);
     color: var(--primary-color);
     font-size: 13px;
     font-weight: 700;
@@ -433,6 +432,7 @@ section {
 }
 
     .history-date-badge:active {
+        transform: scale(0.95);
         background: var(--primary-light);
     }
 
@@ -441,8 +441,8 @@ section {
     justify-content: space-between;
     align-items: center;
     padding: 14px 18px;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid var(--border-color);
+    background: white;
+    border: 2px solid var(--border-color);
     border-radius: 16px;
     margin-bottom: 10px;
 }
@@ -455,13 +455,7 @@ section {
     border-radius: 10px;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s;
 }
-
-    .delete-btn:hover {
-        background: #ff4d4f;
-        color: white;
-    }
 
 /* ===== 9. 勋章墙与分页 ===== */
 .medal-stats-bar {
@@ -471,6 +465,7 @@ section {
     padding: 18px;
     border-radius: 20px;
     margin-bottom: 20px;
+    border: 1px solid var(--border-color);
 }
 
 .honor-grid {
@@ -480,8 +475,8 @@ section {
 }
 
 .honor-item {
-    background: rgba(255, 255, 255, 0.7);
-    border: 2px solid #f0efff;
+    background: white;
+    border: 2px solid var(--border-color);
     border-radius: 20px;
     padding: 18px;
     text-align: center;
@@ -492,21 +487,65 @@ section {
         transform: translateY(-5px);
     }
 
+.pagination-controls {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 15px;
+    margin-top: 25px;
+}
+
 .page-btn {
     background: #f0f0ff;
-    border: none;
+    border: 1px solid var(--border-color);
     padding: 10px 20px;
     border-radius: 12px;
     color: var(--primary-color);
     font-weight: 700;
     cursor: pointer;
+    min-width: 80px;
 }
 
     .page-btn:disabled {
         color: #ccc;
         background: #f5f5f5;
+        border-color: #eee;
         cursor: not-allowed;
     }
+
+/* 勋章领取实时提示弹窗 (对应 JS checkMedalForDay) */
+#medalPopup {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    padding: 14px 28px;
+    border-radius: 50px;
+    box-shadow: 0 10px 25px rgba(123, 104, 238, 0.4);
+    z-index: 2000;
+    display: none; /* 由 JS 控制显示 */
+    font-weight: 800;
+    animation: bounceInDown 0.6s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+@keyframes bounceInDown {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -100px);
+    }
+
+    60% {
+        opacity: 1;
+        transform: translate(-50%, 5px);
+    }
+
+    100% {
+        transform: translate(-50%, 0);
+    }
+}
 
 /* ===== 10. 全局动画与适配 ===== */
 @keyframes fadeIn {

@@ -17,6 +17,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     console.log("应用启动中...");
 
     initTime();
+
     // 初始化动态背景
     initMathBackground();
 
@@ -36,65 +37,64 @@ window.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
 });
 
-// ===== 4. 增强版：动态数学背景逻辑 (加入景深模糊与随机动效) =====
+// ===== 4. 核心修正：背景生成逻辑 (极致灵动版) =====
 function initMathBackground() {
     const bg = document.getElementById('math-bg');
-    if (!bg) return;
+    if (!bg) {
+        console.error("未找到 id 为 'math-bg' 的背景容器");
+        return;
+    }
 
     const symbols = [
-        'π', 'x + y = ?', '÷', '×', '123', '½', '∑', '∞',
-        '△', '□', '∠A', 'r²', '99×9', '5+7=12', 'V=sh', 'a²+b²',
-        'y=kx+b', 'sinθ', '6÷2=3', '10%', 'S=πr²', '>', '<', '='
+        'π', 'x+y=?', '÷', '×', 'Σ', '∞', '△', '□', '∠A', 'r²',
+        '99×9', 'V=sh', 'a²+b²', 'sinθ', '10%', 'S=πr²', '>', '<', 'λ'
     ];
+
+    // 清空现有背景防止重复生成
+    bg.innerHTML = '';
 
     const createSymbol = () => {
         const span = document.createElement('span');
         span.className = 'math-symbol';
-
-        // 1. 随机内容
         span.innerText = symbols[Math.floor(Math.random() * symbols.length)];
 
-        // 2. 随机样式参数
-        const startX = Math.random() * 100;
-        const size = Math.random() * (65 - 20) + 20; // 尺寸 20px - 65px
-        const duration = Math.random() * (30 - 20) + 20; // 较慢的浮动速度，减少视觉干扰
-        const delay = Math.random() * 5;
-        const rotate = Math.random() * 60 - 30; // 初始旋转角度
+        // 1. 随机基础参数
+        const isLarge = Math.random() > 0.6; // 40% 的概率产生大符号（近景）
+        const size = isLarge ? (Math.random() * 20 + 30) : (Math.random() * 15 + 15);
 
-        // --- 核心优化：随机模糊度 (景深效果) ---
-        // 30% 的概率产生模糊效果，模拟背景深度
-        const blurVal = Math.random() > 0.7 ? (Math.random() * 2.5) : 0;
+        // 2. 速度逻辑：大的快(近)，小的慢(远)
+        // 运动时间由之前的 25s 提升到 4s - 10s 之间
+        const duration = isLarge ? (Math.random() * 3 + 4) : (Math.random() * 4 + 6);
 
-        // 3. 应用样式
-        span.style.left = `${startX}%`;
-        span.style.bottom = `-100px`; // 从屏幕下方更远处开始，避免突兀出现
+        const randomTop = Math.random() * 100;
+        const randomLeft = Math.random() * 100;
+
+        // 3. 负延迟让动画立即在随机帧开始
+        const delay = Math.random() * -20;
+
+        // 4. 景深效果：只有 20% 的符号会有模糊感
+        const blurVal = Math.random() > 0.8 ? (Math.random() * 1.5) : 0;
+
+        // 样式内联设置
+        span.style.position = 'absolute';
+        span.style.top = `${randomTop}%`;
+        span.style.left = `${randomLeft}%`;
         span.style.fontSize = `${size}px`;
-        span.style.filter = `blur(${blurVal}px)`; // 应用景深模糊
-        span.style.transform = `rotate(${rotate}deg)`;
+        span.style.filter = `blur(${blurVal}px)`;
 
-        // 配合 CSS 变量：颜色使用深紫色，较低不透明度
-        span.style.color = "rgba(107, 70, 193, 0.22)";
-        span.style.fontWeight = "900";
-        span.style.fontFamily = "'Comic Sans MS', 'Chalkboard SE', 'Quicksand', sans-serif";
+        // 透明度：近景清晰，远景淡入背景
+        span.style.opacity = isLarge ? `${0.2 + Math.random() * 0.1}` : `${0.1 + Math.random() * 0.1}`;
 
-        // 应用 CSS 动画
-        span.style.animation = `floatAnimation ${duration}s ease-in-out ${delay}s infinite`;
+        // 5. 应用 CSS 中定义的 floatSway 动画
+        // 如果你的 CSS 动画名还是 floatRandom，请务必在 CSS 中改为 floatSway
+        span.style.animation = `floatSway ${duration}s ease-in-out ${delay}s infinite`;
 
         bg.appendChild(span);
-
-        // 4. 定期清理并重绘，保持性能
-        setTimeout(() => {
-            if (span.parentNode) {
-                span.remove();
-                createSymbol();
-            }
-        }, (duration + delay) * 1000);
     };
 
-    // 初始生成数量调至 12-15 个
-    // 符号变大后，数量不需要太多，以免背景显得杂乱
-    for (let i = 0; i < 14; i++) {
-        setTimeout(createSymbol, i * 800);
+    // 生成 25 个符号，让画面更丰富
+    for (let i = 0; i < 25; i++) {
+        createSymbol();
     }
 }
 
@@ -435,7 +435,8 @@ function refreshUI() {
 
 async function saveDayData() {
     const btn = safeGet("saveDayBtn");
-    const originalText = btn ? btn.textContent : "保存今日记录";
+    if (!btn) return;
+    const originalText = btn.textContent;
     const mathVal = clamp01(safeGet("mathInput")?.value);
     const readingVal = clamp01(safeGet("readingInput")?.value);
     const spellingVal = clamp01(safeGet("spellingInput")?.value);
@@ -443,15 +444,13 @@ async function saveDayData() {
     hist[selectedDateISO] = { math: mathVal, reading: readingVal, spelling: spellingVal };
     setHistory(hist);
     if (currentUser) {
-        if (btn) btn.textContent = "⏳ 正在同步...";
+        btn.textContent = "⏳ 正在同步...";
         await sbClient.from('learning_records').upsert({
             user_id: currentUser.id, date: selectedDateISO,
             math: mathVal, reading: readingVal, spelling: spellingVal
         }, { onConflict: 'user_id,date' });
-        if (btn) {
-            btn.textContent = "✅ 保存成功";
-            setTimeout(() => { btn.textContent = originalText; }, 1500);
-        }
+        btn.textContent = "✅ 保存成功";
+        setTimeout(() => { btn.textContent = originalText; }, 1500);
     }
     if (document.activeElement) document.activeElement.blur();
     refreshUI();

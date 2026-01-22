@@ -5,10 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>学习进度追踪 - 荣誉版</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 核心动画：随机平铺浮动 */
+        @keyframes floatRandom {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            33% {
+                transform: translate(25px, -35px) rotate(5deg);
+            }
+
+            66% {
+                transform: translate(-20px, 15px) rotate(-5deg);
+            }
+
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+        }
+
+        .math-symbol {
+            position: absolute;
+            font-weight: 900;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            will-change: transform;
+            /* 增加细微白色描边，让深紫色在不同背景下都清晰 */
+            text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5);
+            z-index: -1;
+        }
+    </style>
 </head>
 <body>
 
-    <div id="math-bg"></div>
+    <div id="math-bg" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; background-color: #f8f9fe;"></div>
+
+    <script>
+        (function () {
+            const bg = document.getElementById('math-bg');
+            const symbols = ['∑', 'π', '∞', '√', 'Δ', 'f(x)', 'sin', 'log', '∫', '≈', 'θ', 'λ', 'x+y', 'r²', '99×9'];
+
+            // 生成 30 个随机平铺的符号（稍微增加一点密度）
+            for (let i = 0; i < 30; i++) {
+                const span = document.createElement('span');
+                span.className = 'math-symbol';
+                span.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+
+                // 全屏随机位置
+                const top = Math.random() * 100;
+                const left = Math.random() * 100;
+
+                // 随机动画与视觉参数
+                const duration = 20 + Math.random() * 25;
+                const delay = Math.random() * -30;
+                const size = 18 + Math.random() * 32; // 随机大小
+
+                // --- 核心修改区 ---
+                const op = 0.2 + Math.random() * 0.3; // 调高透明度 (20% - 50%)
+                const deepPurple = "#5b3cc4"; // 深紫色
+
+                span.style.cssText = `
+                        top: ${top}%;
+                        left: ${left}%;
+                        font-size: ${size}px;
+                        color: ${deepPurple};
+                        filter: blur(0px);
+                        animation: floatRandom ${duration}s ease-in-out infinite;
+                        animation-delay: ${delay}s;
+                        opacity: ${op};
+                    `;
+                bg.appendChild(span);
+            }
+        })();
+    </script>
 
     <div id="authContainer" class="container">
         <div class="auth-box">
@@ -41,7 +112,6 @@
     </div>
 
     <div id="appContainer" class="container" style="display: none;">
-
         <div class="status-bar">
             <span id="loginStatus">同步中...</span>
             <button class="text-btn" onclick="handleLogout()">退出登录</button>
@@ -120,15 +190,10 @@
                 <input type="text" id="wrongQuestionInput" placeholder="输入错题描述..." style="flex:1;">
                 <button class="primary-btn" id="addWrongBtn" style="width: 80px; margin-top: 0;">添加</button>
             </div>
-
-            <ul id="wrongList" style="list-style: none; margin-bottom: 20px;">
-            </ul>
-
+            <ul id="wrongList" style="list-style: none; margin-bottom: 20px;"></ul>
             <hr style="margin: 20px 0; border: none; border-top: 1px solid #f0f0f5;">
-
             <h4>历史错题日期 (左右滑动)</h4>
-            <div id="wrongCalendar">
-            </div>
+            <div id="wrongCalendar"></div>
         </section>
 
         <section>
