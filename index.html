@@ -32,9 +32,70 @@
             pointer-events: none;
             user-select: none;
             will-change: transform;
-            /* 增加细微白色描边，让深紫色在不同背景下都清晰 */
             text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5);
             z-index: -1;
+        }
+
+        /* --- 适配手机端的高级感勋章弹窗 --- */
+        #medalPopup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 40px;
+            padding: 30px;
+            box-shadow: 0 25px 50px -12px rgba(123, 104, 238, 0.4);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            animation: medalPopScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            /* 默认尺寸（PC端） */
+            width: 220px;
+            height: 220px;
+        }
+
+            #medalPopup span {
+                font-size: 100px;
+                filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));
+                line-height: 1;
+                display: block;
+            }
+
+        /* --- 移动端适配关键逻辑 --- */
+        @media (max-width: 600px) {
+            #medalPopup {
+                width: 160px; /* 手机端缩小宽度 */
+                height: 160px; /* 手机端缩小高度 */
+                border-radius: 35px;
+                padding: 20px;
+            }
+
+                #medalPopup span {
+                    font-size: 75px; /* 手机端缩小图标 */
+                }
+        }
+
+        /* 弹出动画：增加了透明度过渡和轻微旋转 */
+        @keyframes medalPopScale {
+            0% {
+                transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
+                opacity: 0;
+            }
+
+            70% {
+                transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1) rotate(0deg);
+                opacity: 1;
+            }
         }
     </style>
 </head>
@@ -42,44 +103,7 @@
 
     <div id="math-bg" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; background-color: #f8f9fe;"></div>
 
-    <script>
-        (function () {
-            const bg = document.getElementById('math-bg');
-            const symbols = ['∑', 'π', '∞', '√', 'Δ', 'f(x)', 'sin', 'log', '∫', '≈', 'θ', 'λ', 'x+y', 'r²', '99×9'];
-
-            // 生成 30 个随机平铺的符号（稍微增加一点密度）
-            for (let i = 0; i < 30; i++) {
-                const span = document.createElement('span');
-                span.className = 'math-symbol';
-                span.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-
-                // 全屏随机位置
-                const top = Math.random() * 100;
-                const left = Math.random() * 100;
-
-                // 随机动画与视觉参数
-                const duration = 20 + Math.random() * 25;
-                const delay = Math.random() * -30;
-                const size = 18 + Math.random() * 32; // 随机大小
-
-                // --- 核心修改区 ---
-                const op = 0.2 + Math.random() * 0.3; // 调高透明度 (20% - 50%)
-                const deepPurple = "#5b3cc4"; // 深紫色
-
-                span.style.cssText = `
-                        top: ${top}%;
-                        left: ${left}%;
-                        font-size: ${size}px;
-                        color: ${deepPurple};
-                        filter: blur(0px);
-                        animation: floatRandom ${duration}s ease-in-out infinite;
-                        animation-delay: ${delay}s;
-                        opacity: ${op};
-                    `;
-                bg.appendChild(span);
-            }
-        })();
-    </script>
+    <div id="medalPopup"></div>
 
     <div id="authContainer" class="container">
         <div class="auth-box">
@@ -113,7 +137,7 @@
 
     <div id="appContainer" class="container" style="display: none;">
         <div class="status-bar">
-            <span id="loginStatus">同步中...</span>
+            <span id="loginStatus">👤 用户登录中...</span>
             <button class="text-btn" onclick="handleLogout()">退出登录</button>
         </div>
 
@@ -157,46 +181,45 @@
             </div>
         </section>
 
-        <section>
-            <h3 style="margin-bottom: 15px;">当日数据: <span id="selectedDateText"></span></h3>
+        <section class="entry-section">
+            <h3 style="margin-bottom: 15px;">当日成绩: <span id="selectedDateText" style="color: #7b68ee;"></span></h3>
             <div class="entry-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
                 <div class="entry-item">
-                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">数学 %</label>
+                    <label>数学 %</label>
                     <input type="number" id="mathInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">阅读 %</label>
+                    <label>阅读 %</label>
                     <input type="number" id="readingInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label style="display: block; font-size: 12px; color: #8a87b8; margin-bottom: 5px;">拼写 %</label>
+                    <label>拼写 %</label>
                     <input type="number" id="spellingInput" placeholder="0-100">
                 </div>
             </div>
             <button class="primary-btn" id="saveDayBtn">保存今日记录</button>
-            <div id="medalPopup" style="display:none; text-align:center; margin-top:10px; font-weight:bold; color:#7b68ee; border: 2px solid #7b68ee; border-radius: 12px; padding: 10px;"></div>
         </section>
 
         <section>
-            <h3 style="margin-bottom: 10px;">成绩分布图</h3>
+            <h3 style="margin-bottom: 10px;">成绩趋势对比</h3>
             <div style="position: relative; height: 180px; width: 100%;">
                 <canvas id="dayBarChart"></canvas>
             </div>
         </section>
 
         <section>
-            <h3>错题记录</h3>
+            <h3>错题笔记本</h3>
             <div style="display: flex; gap: 10px; margin: 15px 0;">
-                <input type="text" id="wrongQuestionInput" placeholder="输入错题描述..." style="flex:1;">
+                <input type="text" id="wrongQuestionInput" placeholder="输入错题内容或知识点..." style="flex:1;">
                 <button class="primary-btn" id="addWrongBtn" style="width: 80px; margin-top: 0;">添加</button>
             </div>
-            <ul id="wrongList" style="list-style: none; margin-bottom: 20px;"></ul>
+            <ul id="wrongList" class="wrong-list-container"></ul>
             <hr style="margin: 20px 0; border: none; border-top: 1px solid #f0f0f5;">
-            <h4>历史错题日期 (左右滑动)</h4>
-            <div id="wrongCalendar"></div>
+            <h4 style="color: #8a87b8; font-size: 13px;">历史错题库 (点击日期查看)</h4>
+            <div id="wrongCalendar" class="history-scroll-box"></div>
         </section>
 
-        <section>
+        <section class="honor-section">
             <h3 style="margin-bottom: 15px;">🏆 勋章荣誉墙</h3>
             <div class="medal-stats-bar">
                 <div class="stat-item">🥇 金牌: <span id="goldCount">0</span></div>
@@ -205,14 +228,14 @@
             </div>
             <div id="honorWall" class="honor-grid"></div>
             <div class="pagination-controls">
-                <button id="prevPageBtn" class="page-btn" disabled>上一页</button>
+                <button id="prevPageBtn" class="page-btn">上一页</button>
                 <span id="pageIndicator">第 1 / 1 页</span>
-                <button id="nextPageBtn" class="page-btn" disabled>下一页</button>
+                <button id="nextPageBtn" class="page-btn">下一页</button>
             </div>
         </section>
 
-        <div class="footer-actions" style="text-align: center; margin-top: 10px;">
-            <button class="text-btn">导出我的学习周报 (PDF预览)</button>
+        <div class="footer-actions" style="text-align: center; margin: 20px 0;">
+            <button class="text-btn">生成学习周报</button>
         </div>
     </div>
 

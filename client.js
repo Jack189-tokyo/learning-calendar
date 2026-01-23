@@ -8,6 +8,10 @@ let currentYear, currentMonth, selectedDateISO, currentUser;
 let currentSubject = "math";
 let barChart;
 
+// 交互变量：用于存储鼠标/触摸实时位置
+let mouseX = -1000;
+let mouseY = -1000;
+
 // 分页全局变量
 let currentPage = 1;
 const ITEMS_PER_PAGE = 6;
@@ -18,9 +22,19 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     initTime();
 
+    // 监听全局交互位置 (适配 PC 和 移动端)
+    const updatePos = (e) => {
+        mouseX = e.clientX || (e.touches ? e.touches[0].clientX : -1000);
+        mouseY = e.clientY || (e.touches ? e.touches[0].clientY : -1000);
+    };
+    window.addEventListener('mousemove', updatePos);
+    window.addEventListener('touchstart', updatePos, { passive: true });
+    window.addEventListener('touchmove', updatePos, { passive: true });
+
     // 初始化动态背景
     initMathBackground();
 
+    // 初始化图表和自定义下拉框
     if (document.getElementById("dayBarChart")) initBarChart();
     initCustomSelect();
 
@@ -37,72 +51,85 @@ window.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
 });
 
-// ===== 4. 核心修正：背景生成逻辑 (极致灵动版) =====
+// ===== 4. 动态背景生成 (灵动避让版) =====
 function initMathBackground() {
     const bg = document.getElementById('math-bg');
-    if (!bg) {
-        console.error("未找到 id 为 'math-bg' 的背景容器");
-        return;
-    }
+    if (!bg) return;
 
     const symbols = [
-        'π', 'x+y=?', '÷', '×', 'Σ', '∞', '△', '□', '∠A', 'r²',
-        '99×9', 'V=sh', 'a²+b²', 'sinθ', '10%', 'S=πr²', '>', '<', 'λ'
+        'π', 'x+y', '÷', '×', 'Σ', '∞', '△', '∠A', 'r²',
+        'a²+b²', 'sinθ', '10%', 'S=πr²', 'f(x)', '√', '∫'
     ];
-
-    // 清空现有背景防止重复生成
+    const colors = ['#7b68ee', '#6a5acd', '#483d8b', '#5c4dff', '#9370db'];
     bg.innerHTML = '';
 
-    const createSymbol = () => {
+    // 移动端减少数量以保证流畅度
+    const count = window.innerWidth < 600 ? 25 : 45;
+
+    for (let i = 0; i < count; i++) {
         const span = document.createElement('span');
         span.className = 'math-symbol';
         span.innerText = symbols[Math.floor(Math.random() * symbols.length)];
 
-        // 1. 随机基础参数
-        const isLarge = Math.random() > 0.6; // 40% 的概率产生大符号（近景）
-        const size = isLarge ? (Math.random() * 20 + 30) : (Math.random() * 15 + 15);
+        const isLarge = Math.random() > 0.6;
+        const size = isLarge ? (Math.random() * 20 + 25) : (Math.random() * 10 + 15);
+        const baseOpacity = isLarge ? 0.2 : 0.1;
 
-        // 2. 速度逻辑：大的快(近)，小的慢(远)
-        // 运动时间由之前的 25s 提升到 4s - 10s 之间
-        const duration = isLarge ? (Math.random() * 3 + 4) : (Math.random() * 4 + 6);
+        const startXPercent = Math.random() * 100;
+        const startYPercent = Math.random() * 100;
+        const phase = Math.random() * Math.PI * 2;
+        const freq = isLarge ? 0.0008 : 0.0004;
+        const symbolColor = colors[Math.floor(Math.random() * colors.length)];
 
-        const randomTop = Math.random() * 100;
-        const randomLeft = Math.random() * 100;
-
-        // 3. 负延迟让动画立即在随机帧开始
-        const delay = Math.random() * -20;
-
-        // 4. 景深效果：只有 20% 的符号会有模糊感
-        const blurVal = Math.random() > 0.8 ? (Math.random() * 1.5) : 0;
-
-        // 样式内联设置
-        span.style.position = 'absolute';
-        span.style.top = `${randomTop}%`;
-        span.style.left = `${randomLeft}%`;
-        span.style.fontSize = `${size}px`;
-        span.style.filter = `blur(${blurVal}px)`;
-
-        // 透明度：近景清晰，远景淡入背景
-        span.style.opacity = isLarge ? `${0.2 + Math.random() * 0.1}` : `${0.1 + Math.random() * 0.1}`;
-
-        // 5. 应用 CSS 中定义的 floatSway 动画
-        // 如果你的 CSS 动画名还是 floatRandom，请务必在 CSS 中改为 floatSway
-        span.style.animation = `floatSway ${duration}s ease-in-out ${delay}s infinite`;
+        Object.assign(span.style, {
+            position: 'absolute',
+            left: `${startXPercent}%`,
+            top: `${startYPercent}%`,
+            fontSize: `${size}px`,
+            opacity: baseOpacity,
+            color: symbolColor,
+            zIndex: '0',
+            transition: 'opacity 0.3s ease',
+            pointerEvents: 'none'
+        });
 
         bg.appendChild(span);
-    };
 
-    // 生成 25 个符号，让画面更丰富
-    for (let i = 0; i < 25; i++) {
-        createSymbol();
+        function animate() {
+            const time = Date.now() * freq + phase;
+            let driftX = Math.sin(time * 0.8) * 40;
+            let driftY = Math.cos(time * 0.7) * 40;
+            const rotation = Math.sin(time * 0.5) * 20;
+
+            const rect = span.getBoundingClientRect();
+            const symbolCenterX = rect.left + rect.width / 2;
+            const symbolCenterY = rect.top + rect.height / 2;
+            const distance = Math.hypot(mouseX - symbolCenterX, mouseY - symbolCenterY);
+
+            let finalOpacity = baseOpacity;
+            let finalScale = 1;
+
+            // 避让算法
+            if (distance < 150) {
+                const angle = Math.atan2(symbolCenterY - mouseY, symbolCenterX - mouseX);
+                const pushForce = (150 - distance) / 150;
+                driftX += Math.cos(angle) * pushForce * 60;
+                driftY += Math.sin(angle) * pushForce * 60;
+                finalOpacity = baseOpacity + (0.5 * pushForce);
+                finalScale = 1 + (0.3 * pushForce);
+            }
+
+            span.style.transform = `translate(${driftX}px, ${driftY}px) scale(${finalScale}) rotate(${rotation}deg)`;
+            span.style.opacity = finalOpacity;
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
     }
 }
 
-// ===== 5. 安全获取元素函数 =====
+// ===== 5. 核心逻辑与数据处理 =====
 function safeGet(id) {
-    const el = document.getElementById(id);
-    if (!el) console.warn(`[页面兼容性] 未找到 ID 为 "${id}" 的元素。`);
-    return el;
+    return document.getElementById(id);
 }
 
 function initTime() {
@@ -112,18 +139,22 @@ function initTime() {
     selectedDateISO = formatDate(today);
 }
 
-// ===== 6. 身份验证 (Auth) 函数 =====
+function formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+// 身份验证逻辑
 async function handleLogin() {
     const email = safeGet("emailInput")?.value.trim();
     const password = safeGet("passwordInput")?.value;
     const msg = safeGet("authMsg");
-    if (!email || !password) { if (msg) msg.textContent = "❌ 请输入邮箱和密码"; return; }
-
-    if (msg) msg.textContent = "⏳ 正在登录...";
+    if (!email || !password) { if (msg) msg.textContent = "❌ 请输入完整信息"; return; }
+    msg.textContent = "⏳ 正在登录...";
     const { error } = await sbClient.auth.signInWithPassword({ email, password });
-    if (error && msg) {
-        msg.textContent = "❌ " + error.message;
-    }
+    if (error && msg) msg.textContent = "❌ " + error.message;
 }
 
 async function handleRegister() {
@@ -131,12 +162,10 @@ async function handleRegister() {
     const password = safeGet("regPasswordInput")?.value;
     const msg = safeGet("authMsg");
     if (!email || !password || password.length < 6) {
-        if (msg) msg.textContent = "❌ 邮箱无效或密码太短 (至少6位)";
-        return;
+        if (msg) msg.textContent = "❌ 邮箱无效或密码太短"; return;
     }
-
     const { error } = await sbClient.auth.signUp({ email, password });
-    if (msg) msg.textContent = error ? "❌ " + error.message : "✅ 注册成功！直接登录即可。";
+    if (msg) msg.textContent = error ? "❌ " + error.message : "✅ 注册成功！请登录";
 }
 
 async function handleLogout() {
@@ -146,33 +175,24 @@ async function handleLogout() {
 }
 
 function showMainApp() {
-    const auth = safeGet("authContainer");
-    const app = safeGet("appContainer");
-    if (auth) auth.style.display = "none";
-    if (app) app.style.display = "block";
+    safeGet("authContainer").style.display = "none";
+    safeGet("appContainer").style.display = "block";
     syncAllFromCloud();
 }
 
 function showAuthForm() {
-    const auth = safeGet("authContainer");
-    const app = safeGet("appContainer");
-    if (auth) auth.style.display = "block";
-    if (app) app.style.display = "none";
+    safeGet("authContainer").style.display = "block";
+    safeGet("appContainer").style.display = "none";
 }
 
 function toggleAuthMode(mode) {
-    const loginF = safeGet("loginForm");
-    const regF = safeGet("registerForm");
-    const btnL = safeGet("showLogin");
-    const btnR = safeGet("showRegister");
-
-    if (loginF) loginF.style.display = mode === 'login' ? 'block' : 'none';
-    if (regF) regF.style.display = mode === 'reg' ? 'block' : 'none';
-    if (btnL) btnL.classList.toggle("active", mode === 'login');
-    if (btnR) btnR.classList.toggle("active", mode === 'reg');
+    safeGet("loginForm").style.display = mode === 'login' ? 'block' : 'none';
+    safeGet("registerForm").style.display = mode === 'reg' ? 'block' : 'none';
+    safeGet("showLogin").classList.toggle("active", mode === 'login');
+    safeGet("showRegister").classList.toggle("active", mode === 'reg');
 }
 
-// ===== 7. 云端数据同步 =====
+// ===== 6. 云端数据同步 =====
 async function syncAllFromCloud() {
     if (!currentUser) return;
     const statusEl = safeGet("loginStatus");
@@ -180,20 +200,20 @@ async function syncAllFromCloud() {
 
     try {
         const [recordsRes, wrongsRes, honorsRes] = await Promise.all([
-            sbClient.from('learning_records').select('*'),
-            sbClient.from('wrong_book').select('*'),
-            sbClient.from('honor_wall').select('*')
+            sbClient.from('learning_records').select('*').eq('user_id', currentUser.id),
+            sbClient.from('wrong_book').select('*').eq('user_id', currentUser.id),
+            sbClient.from('honor_wall').select('*').eq('user_id', currentUser.id)
         ]);
 
         if (recordsRes.data) {
             const hist = {};
             recordsRes.data.forEach(r => { hist[r.date] = { math: r.math, reading: r.reading, spelling: r.spelling }; });
-            setHistory(hist);
+            localStorage.setItem("accuracyHistory", JSON.stringify(hist));
         }
         if (wrongsRes.data) {
             const wb = {};
             wrongsRes.data.forEach(w => { if (!wb[w.date]) wb[w.date] = []; wb[w.date].push(w.content); });
-            setWrongBook(wb);
+            localStorage.setItem("wrongBook", JSON.stringify(wb));
         }
         if (honorsRes.data) {
             const hw = honorsRes.data.map(h => ({ date: h.date, medal: h.medal }));
@@ -203,53 +223,21 @@ async function syncAllFromCloud() {
         setSelected(selectedDateISO);
         if (statusEl) statusEl.textContent = `👤 ${currentUser.email}`;
     } catch (e) {
-        console.error("同步出错:", e);
+        console.error("同步失败:", e);
     }
 }
 
-// ===== 8. 下拉菜单逻辑 =====
-function initCustomSelect() {
-    const trigger = safeGet('selectTrigger');
-    const optionsContainer = safeGet('customOptions');
-    const optionItems = document.querySelectorAll('.custom-option');
-    const selectedText = safeGet('selectedOptionText');
-
-    if (!trigger || !optionsContainer) return;
-
-    trigger.onclick = (e) => {
-        e.stopPropagation();
-        const isOpen = optionsContainer.classList.contains('show');
-        document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show'));
-        if (!isOpen) optionsContainer.classList.add('show');
-    };
-
-    optionItems.forEach(item => {
-        item.onclick = function (e) {
-            e.stopPropagation();
-            currentSubject = this.getAttribute('data-value');
-            if (selectedText) selectedText.innerText = this.innerText;
-            optionItems.forEach(i => i.classList.remove('active'));
-            this.classList.add('active');
-            optionsContainer.classList.remove('show');
-            renderCalendarGrid();
-        };
-    });
-
-    document.addEventListener('click', () => {
-        if (optionsContainer) optionsContainer.classList.remove('show');
-    });
-}
-
-// ===== 9. 渲染函数汇总 =====
+// ===== 7. UI 渲染渲染汇总 =====
 function renderCalendarGrid() {
     const grid = safeGet("calendarGrid");
     const label = safeGet("currentMonthLabel");
     if (!grid) return;
     grid.innerHTML = "";
-    if (label) label.textContent = `${currentYear}年${currentMonth + 1}月`;
+    label.textContent = `${currentYear}年${currentMonth + 1}月`;
 
-    const hist = getHistory();
-    const offset = firstDayOffset(currentYear, currentMonth);
+    const hist = JSON.parse(localStorage.getItem("accuracyHistory") || "{}");
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
     const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
 
     for (let i = 0; i < offset; i++) {
@@ -267,7 +255,15 @@ function renderCalendarGrid() {
         const data = hist[dateISO];
         const acc = data ? data[currentSubject] : null;
 
-        dayCell.classList.add(levelClassForAccuracy(acc));
+        // 渲染正确率等级颜色
+        if (acc !== null && acc !== "") {
+            const val = Number(acc);
+            if (val < 30) dayCell.classList.add("level-1");
+            else if (val < 60) dayCell.classList.add("level-2");
+            else if (val < 90) dayCell.classList.add("level-3");
+            else dayCell.classList.add("level-4");
+        }
+
         if (dateISO === selectedDateISO) dayCell.classList.add("selected");
         dayCell.onclick = () => setSelected(dateISO);
 
@@ -280,7 +276,7 @@ function renderCalendarGrid() {
 }
 
 function renderBarForSelectedDay() {
-    const data = getHistory()[selectedDateISO] || {};
+    const data = JSON.parse(localStorage.getItem("accuracyHistory") || "{}")[selectedDateISO] || {};
     if (barChart) {
         barChart.data.datasets[0].data = [data.math || 0, data.reading || 0, data.spelling || 0];
         barChart.update();
@@ -290,51 +286,16 @@ function renderBarForSelectedDay() {
 function renderWrongListForSelectedDay() {
     const list = safeGet("wrongList");
     if (!list) return;
-    const arr = getWrongBook()[selectedDateISO] || [];
-
+    const arr = JSON.parse(localStorage.getItem("wrongBook") || "{}")[selectedDateISO] || [];
     if (arr.length === 0) {
-        list.innerHTML = `<li style="color:#ccc; font-size:12px; text-align:center; padding:10px;">本日无错题记录</li>`;
+        list.innerHTML = `<li style="color:#ccc; font-size:12px; text-align:center; padding:10px;">本日无错题</li>`;
         return;
     }
-
     list.innerHTML = arr.map((q, i) => `
         <li class="wrong-item">
             <span class="wrong-text">${q}</span>
             <button class="delete-btn" onclick="deleteWrong(${i}, '${q}')">删除</button>
         </li>
-    `).join("");
-}
-
-async function deleteWrong(index, content) {
-    const wb = getWrongBook();
-    wb[selectedDateISO].splice(index, 1);
-    setWrongBook(wb);
-    if (currentUser) {
-        await sbClient.from('wrong_book').delete().match({
-            user_id: currentUser.id,
-            date: selectedDateISO,
-            content: content
-        });
-    }
-    refreshUI();
-}
-
-function renderWrongCalendar() {
-    const wb = getWrongBook();
-    const container = safeGet("wrongCalendar");
-    if (!container) return;
-
-    const dates = Object.keys(wb)
-        .filter(d => wb[d].length > 0)
-        .sort((a, b) => new Date(b) - new Date(a));
-
-    if (dates.length === 0) {
-        container.innerHTML = `<span style="color:#ccc; font-size:12px; padding:10px;">暂无历史记录</span>`;
-        return;
-    }
-
-    container.innerHTML = dates.map(d => `
-        <button class="history-date-badge" onclick="setSelected('${d}')">${d}</button>
     `).join("");
 }
 
@@ -351,74 +312,36 @@ function renderHonorWall() {
     if (safeGet("silverCount")) safeGet("silverCount").textContent = stats.silver;
     if (safeGet("bronzeCount")) safeGet("bronzeCount").textContent = stats.bronze;
 
-    const sortedHonors = allHonors.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const totalPages = Math.max(1, Math.ceil(sortedHonors.length / ITEMS_PER_PAGE));
-    if (currentPage > totalPages) currentPage = totalPages;
-
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    const pagedHonors = sortedHonors.slice(start, start + ITEMS_PER_PAGE);
+    const sorted = allHonors.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
+    const paged = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const container = safeGet("honorWall");
-    if (!container) return;
-
-    if (pagedHonors.length === 0) {
+    if (paged.length === 0) {
         container.innerHTML = `<div style="grid-column: span 2; color:#ccc; text-align:center; padding:20px;">暂无勋章</div>`;
     } else {
-        container.innerHTML = pagedHonors.map(item => `
+        container.innerHTML = paged.map(item => `
             <div class="honor-item">
                 <span style="font-size: 11px; color: #8a87b8;">${item.date}</span>
                 <div style="font-size: 15px; margin-top:5px; font-weight:bold;">${item.medal}</div>
             </div>
         `).join("");
     }
-
     if (safeGet("pageIndicator")) safeGet("pageIndicator").textContent = `第 ${currentPage} / ${totalPages} 页`;
-    if (safeGet("prevPageBtn")) safeGet("prevPageBtn").disabled = (currentPage === 1);
-    if (safeGet("nextPageBtn")) safeGet("nextPageBtn").disabled = (currentPage === totalPages);
 }
 
-// ===== 10. 工具函数 =====
-function getHistory() { return JSON.parse(localStorage.getItem("accuracyHistory") || "{}"); }
-function setHistory(hist) { localStorage.setItem("accuracyHistory", JSON.stringify(hist)); }
-function getWrongBook() { return JSON.parse(localStorage.getItem("wrongBook") || "{}"); }
-function setWrongBook(wb) { localStorage.setItem("wrongBook", JSON.stringify(wb)); }
-
-function formatDate(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
-function clamp01(v) {
-    if (v === "" || v === null) return null;
-    return Math.min(100, Math.max(0, Number(v)));
-}
-
-function levelClassForAccuracy(acc) {
-    if (acc === null || acc === undefined || acc === "") return "level-0";
-    const val = Number(acc);
-    if (val < 30) return "level-1";
-    if (val < 60) return "level-2";
-    if (val < 90) return "level-3";
-    return "level-4";
-}
-
-function firstDayOffset(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
-
+// ===== 8. 功能操作函数 =====
 function setSelected(iso) {
     selectedDateISO = iso;
     const parts = iso.split("-");
     currentYear = parseInt(parts[0]);
     currentMonth = parseInt(parts[1]) - 1;
+    if (safeGet("selectedDateText")) safeGet("selectedDateText").textContent = iso;
 
-    const dateTxt = safeGet("selectedDateText");
-    if (dateTxt) dateTxt.textContent = iso;
-
-    const data = getHistory()[iso] || {};
-    if (safeGet("mathInput")) safeGet("mathInput").value = (data.math !== null && data.math !== undefined) ? data.math : "";
-    if (safeGet("readingInput")) safeGet("readingInput").value = (data.reading !== null && data.reading !== undefined) ? data.reading : "";
-    if (safeGet("spellingInput")) safeGet("spellingInput").value = (data.spelling !== null && data.spelling !== undefined) ? data.spelling : "";
+    const data = JSON.parse(localStorage.getItem("accuracyHistory") || "{}")[iso] || {};
+    if (safeGet("mathInput")) safeGet("mathInput").value = data.math ?? "";
+    if (safeGet("readingInput")) safeGet("readingInput").value = data.reading ?? "";
+    if (safeGet("spellingInput")) safeGet("spellingInput").value = data.spelling ?? "";
 
     refreshUI();
 }
@@ -427,124 +350,96 @@ function refreshUI() {
     renderCalendarGrid();
     renderBarForSelectedDay();
     renderWrongListForSelectedDay();
-    renderWrongCalendar();
     renderHonorWall();
-    const wrongCal = safeGet("wrongCalendar");
-    if (wrongCal) wrongCal.scrollLeft = 0;
+    // 错题库历史滑块
+    const wb = JSON.parse(localStorage.getItem("wrongBook") || "{}");
+    const container = safeGet("wrongCalendar");
+    if (container) {
+        const dates = Object.keys(wb).filter(d => wb[d].length > 0).sort((a, b) => new Date(b) - new Date(a));
+        container.innerHTML = dates.length ? dates.map(d => `<button class="history-date-badge" onclick="setSelected('${d}')">${d}</button>`).join("") : "暂无历史";
+    }
 }
 
 async function saveDayData() {
     const btn = safeGet("saveDayBtn");
-    if (!btn) return;
-    const originalText = btn.textContent;
-    const mathVal = clamp01(safeGet("mathInput")?.value);
-    const readingVal = clamp01(safeGet("readingInput")?.value);
-    const spellingVal = clamp01(safeGet("spellingInput")?.value);
-    const hist = getHistory();
-    hist[selectedDateISO] = { math: mathVal, reading: readingVal, spelling: spellingVal };
-    setHistory(hist);
+    const m = Math.min(100, Math.max(0, Number(safeGet("mathInput").value || 0)));
+    const r = Math.min(100, Math.max(0, Number(safeGet("readingInput").value || 0)));
+    const s = Math.min(100, Math.max(0, Number(safeGet("spellingInput").value || 0)));
+
+    const hist = JSON.parse(localStorage.getItem("accuracyHistory") || "{}");
+    hist[selectedDateISO] = { math: m, reading: r, spelling: s };
+    localStorage.setItem("accuracyHistory", JSON.stringify(hist));
+
     if (currentUser) {
-        btn.textContent = "⏳ 正在同步...";
+        btn.textContent = "⏳ 同步中...";
         await sbClient.from('learning_records').upsert({
-            user_id: currentUser.id, date: selectedDateISO,
-            math: mathVal, reading: readingVal, spelling: spellingVal
+            user_id: currentUser.id, date: selectedDateISO, math: m, reading: r, spelling: s
         }, { onConflict: 'user_id,date' });
         btn.textContent = "✅ 保存成功";
-        setTimeout(() => { btn.textContent = originalText; }, 1500);
+        setTimeout(() => btn.textContent = "保存本日记录", 1500);
     }
-    if (document.activeElement) document.activeElement.blur();
     refreshUI();
     checkMedalForDay();
 }
 
 async function addWrongToBook() {
     const input = safeGet("wrongQuestionInput");
-    const val = (input?.value || "").trim();
+    const val = input.value.trim();
     if (!val) return;
-    const wb = getWrongBook();
+    const wb = JSON.parse(localStorage.getItem("wrongBook") || "{}");
     wb[selectedDateISO] = wb[selectedDateISO] || [];
     wb[selectedDateISO].push(val);
-    setWrongBook(wb);
+    localStorage.setItem("wrongBook", JSON.stringify(wb));
     if (currentUser) {
         await sbClient.from('wrong_book').insert({ user_id: currentUser.id, date: selectedDateISO, content: val });
     }
-    if (input) input.value = "";
-    if (document.activeElement) document.activeElement.blur();
+    input.value = "";
     refreshUI();
 }
 
-function bindEvents() {
-    const btnL = safeGet("showLogin");
-    const btnR = safeGet("showRegister");
-    if (btnL) btnL.onclick = () => toggleAuthMode('login');
-    if (btnR) btnR.onclick = () => toggleAuthMode('reg');
-    const prevM = safeGet("prevMonthBtn");
-    const nextM = safeGet("nextMonthBtn");
-    if (prevM) prevM.onclick = (e) => {
-        e.stopPropagation();
-        if (--currentMonth < 0) { currentMonth = 11; currentYear--; }
-        renderCalendarGrid();
-    };
-    if (nextM) nextM.onclick = (e) => {
-        e.stopPropagation();
-        if (++currentMonth > 11) { currentMonth = 0; currentYear++; }
-        renderCalendarGrid();
-    };
-    const prevP = safeGet("prevPageBtn");
-    const nextP = safeGet("nextPageBtn");
-    if (prevP) prevP.onclick = () => { if (currentPage > 1) { currentPage--; renderHonorWall(); } };
-    if (nextP) nextP.onclick = () => {
-        const allHonors = JSON.parse(localStorage.getItem("honorWall") || "[]");
-        const totalPages = Math.ceil(allHonors.length / ITEMS_PER_PAGE);
-        if (currentPage < totalPages) { currentPage++; renderHonorWall(); }
-    };
-    const saveBtn = safeGet("saveDayBtn");
-    const addWBtn = safeGet("addWrongBtn");
-    if (saveBtn) saveBtn.onclick = saveDayData;
-    if (addWBtn) addWBtn.onclick = addWrongToBook;
+async function deleteWrong(index, content) {
+    const wb = JSON.parse(localStorage.getItem("wrongBook") || "{}");
+    wb[selectedDateISO].splice(index, 1);
+    localStorage.setItem("wrongBook", JSON.stringify(wb));
+    if (currentUser) {
+        await sbClient.from('wrong_book').delete().match({ user_id: currentUser.id, date: selectedDateISO, content: content });
+    }
+    refreshUI();
 }
 
-function initBarChart() {
-    const canvas = safeGet("dayBarChart");
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    barChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: ["数学", "阅读", "拼写"],
-            datasets: [{
-                label: "正确率%",
-                data: [0, 0, 0],
-                backgroundColor: ["#7b68ee", "#84cc16", "#facc15"],
-                borderRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, max: 100, grid: { color: "rgba(0,0,0,0.05)" } },
-                x: { grid: { display: false } }
-            },
-            plugins: { legend: { display: false } }
-        }
-    });
-}
-
+// ===== 9. 勋章逻辑 (核心修改点) =====
 function checkMedalForDay() {
-    const day = getHistory()[selectedDateISO] || {};
-    const scores = [day.math, day.reading, day.spelling].filter(v => v !== null && v !== undefined);
-    if (scores.length < 3) return;
-    const count90 = scores.filter(v => v >= 90).length;
-    let medal = count90 === 3 ? "🥇 金牌" : count90 === 2 ? "🥈 银牌" : count90 === 1 ? "🥉 铜牌" : null;
-    if (medal) {
+    const data = JSON.parse(localStorage.getItem("accuracyHistory") || "{}")[selectedDateISO] || {};
+    const scores = [data.math, data.reading, data.spelling];
+
+    // 必须三个科目都填了数据才触发
+    if (scores.some(v => v === undefined || v === null || v === "")) return;
+
+    const count90 = scores.filter(v => Number(v) >= 90).length;
+    let medalEmoji = "";
+    let medalName = "";
+
+    if (count90 === 3) { medalEmoji = "🥇"; medalName = "🥇 金牌"; }
+    else if (count90 === 2) { medalEmoji = "🥈"; medalName = "🥈 银牌"; }
+    else if (count90 === 1) { medalEmoji = "🥉"; medalName = "🥉 铜牌"; }
+
+    if (medalEmoji) {
         const popup = safeGet("medalPopup");
         if (popup) {
-            popup.textContent = `恭喜获得 ${medal}!`;
-            popup.style.display = "block";
-            setTimeout(() => popup.style.display = "none", 3000);
+            popup.innerHTML = `<span>${medalEmoji}</span>`;
+            popup.style.display = "flex";
+            popup.style.opacity = "1";
+
+            // 手机端震动
+            if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
+
+            setTimeout(() => {
+                popup.style.transition = "opacity 1s ease";
+                popup.style.opacity = "0";
+                setTimeout(() => { popup.style.display = "none"; }, 1000);
+            }, 2000);
         }
-        addMedalToHonorWall(selectedDateISO, medal);
+        addMedalToHonorWall(selectedDateISO, medalName);
     }
 }
 
@@ -553,6 +448,63 @@ async function addMedalToHonorWall(date, medal) {
     if (honor.some(h => h.date === date && h.medal === medal)) return;
     honor.push({ date, medal });
     localStorage.setItem("honorWall", JSON.stringify(honor));
-    if (currentUser) await sbClient.from('honor_wall').insert({ user_id: currentUser.id, date, medal });
+    if (currentUser) {
+        await sbClient.from('honor_wall').insert({ user_id: currentUser.id, date, medal });
+    }
     renderHonorWall();
+}
+
+// ===== 10. 初始化辅助函数 =====
+function initCustomSelect() {
+    const trigger = safeGet('selectTrigger');
+    const optionsContainer = safeGet('customOptions');
+    if (!trigger) return;
+
+    trigger.onclick = (e) => {
+        e.stopPropagation();
+        optionsContainer.classList.toggle('show');
+    };
+
+    document.querySelectorAll('.custom-option').forEach(item => {
+        item.onclick = function () {
+            currentSubject = this.dataset.value;
+            safeGet('selectedOptionText').innerText = this.innerText;
+            optionsContainer.classList.remove('show');
+            renderCalendarGrid();
+        };
+    });
+    document.addEventListener('click', () => optionsContainer?.classList.remove('show'));
+}
+
+function initBarChart() {
+    const ctx = safeGet("dayBarChart").getContext("2d");
+    barChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["数学", "阅读", "拼写"],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: ["#7b68ee", "#84cc16", "#facc15"],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, max: 100 } },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+function bindEvents() {
+    safeGet("prevMonthBtn").onclick = () => { if (--currentMonth < 0) { currentMonth = 11; currentYear--; } renderCalendarGrid(); };
+    safeGet("nextMonthBtn").onclick = () => { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } renderCalendarGrid(); };
+    safeGet("saveDayBtn").onclick = saveDayData;
+    safeGet("addWrongBtn").onclick = addWrongToBook;
+    safeGet("prevPageBtn").onclick = () => { if (currentPage > 1) { currentPage--; renderHonorWall(); } };
+    safeGet("nextPageBtn").onclick = () => {
+        const total = Math.ceil(JSON.parse(localStorage.getItem("honorWall") || "[]").length / ITEMS_PER_PAGE);
+        if (currentPage < total) { currentPage++; renderHonorWall(); }
+    };
 }
