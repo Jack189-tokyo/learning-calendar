@@ -1,4 +1,4 @@
-﻿// ===== 1. Supabase 配置 =====
+﻿﻿// ===== 1. Supabase 配置 =====
 const SUPABASE_URL = 'https://jzvpilyvupnichmdkizu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_G3MQ5B-Mp61ecNOc3GrZRQ_S7rSK8V6';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -301,8 +301,23 @@ async function saveDayData() {
 
     if (currentUser) {
         if (btn) btn.textContent = "⏳ 同步中...";
-        await sbClient.from('learning_records').upsert({ user_id: currentUser.id, date: selectedDateISO, math: m, reading: r, spelling: s }, { onConflict: 'user_id,date' });
-        if (btn) { btn.textContent = "✅ 保存成功"; setTimeout(() => btn.textContent = "保存本日记录", 1500); }
+        
+        // 修复 400 错误：手动检查记录是否存在，代替 upsert (避免依赖数据库唯一约束)
+        const { data: existing } = await sbClient.from('learning_records').select('id').eq('user_id', currentUser.id).eq('date', selectedDateISO);
+        
+        let error;
+        if (existing && existing.length > 0) {
+            // 存在则更新
+            const res = await sbClient.from('learning_records').update({ math: m, reading: r, spelling: s }).eq('id', existing[0].id);
+            error = res.error;
+        } else {
+            // 不存在则插入
+            const res = await sbClient.from('learning_records').insert({ user_id: currentUser.id, date: selectedDateISO, math: m, reading: r, spelling: s });
+            error = res.error;
+        }
+
+        if (error) { console.error("保存失败:", error); if (btn) btn.textContent = "❌ 保存失败"; }
+        else if (btn) { btn.textContent = "✅ 保存成功"; setTimeout(() => btn.textContent = "保存本日记录", 1500); }
     }
     refreshUI();
     checkMedalForDay();
@@ -345,7 +360,7 @@ function checkMedalForDay() {
         if (p) {
             p.innerHTML = `<span>${emoji}</span>`;
             p.style.display = "flex"; p.style.opacity = "1";
-            setTimeout(() => { p.style.opacity = "0"; setTimeout(() => p.style.display = "none", 1000); }, 2000);
+            setTimeout(() => { p.style.opacity = "0"; setTimeout(() => p.style.display = "none", 300); }, 800);
         }
         addMedalToHonorWall(selectedDateISO, name);
     }

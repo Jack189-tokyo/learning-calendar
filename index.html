@@ -46,6 +46,7 @@
             /* 默认尺寸（PC端） */
             width: 220px;
             height: 220px;
+            transition: opacity 0.3s ease;
         }
 
         #medalPopup span {
@@ -71,6 +72,18 @@
             0% { transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); opacity: 0; }
             70% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); }
             100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .entry-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .chart-container {
+            position: relative;
+            height: 180px;
+            width: 100%;
         }
     </style>
 </head>
@@ -158,17 +171,17 @@
 
         <section class="entry-section">
             <h3 style="margin-bottom: 15px;">当日成绩: <span id="selectedDateText" style="color: #7b68ee;"></span></h3>
-            <div class="entry-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+            <div class="entry-grid">
                 <div class="entry-item">
-                    <label>数学 %</label>
+                    <label for="mathInput">数学 %</label>
                     <input type="number" id="mathInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label>阅读 %</label>
+                    <label for="readingInput">阅读 %</label>
                     <input type="number" id="readingInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label>拼写 %</label>
+                    <label for="spellingInput">拼写 %</label>
                     <input type="number" id="spellingInput" placeholder="0-100">
                 </div>
             </div>
@@ -177,7 +190,7 @@
 
         <section>
             <h3 style="margin-bottom: 10px;">成绩趋势对比</h3>
-            <div style="position: relative; height: 180px; width: 100%;">
+            <div class="chart-container">
                 <canvas id="dayBarChart"></canvas>
             </div>
         </section>
