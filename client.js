@@ -1,5 +1,7 @@
 ﻿﻿// ===== 1. Supabase 配置 =====
 const SUPABASE_URL = 'https://jzvpilyvupnichmdkizu.supabase.co';
+// 注意：这里使用的是 anon (public) key，是可以暴露在前端的。
+// 安全性依赖于 Supabase 数据库中必须开启 RLS (Row Level Security) 策略！
 const SUPABASE_KEY = 'sb_publishable_G3MQ5B-Mp61ecNOc3GrZRQ_S7rSK8V6';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 

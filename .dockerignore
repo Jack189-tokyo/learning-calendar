@@ -1,0 +1,4 @@
+# Ignore Docker specific files
+Dockerfile
+.dockerignore
+.git
