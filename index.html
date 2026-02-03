@@ -85,6 +85,13 @@
             height: 180px;
             width: 100%;
         }
+        .entry-item {
+            text-align: center;
+        }
+        .entry-item input {
+            text-align: center;
+            padding-left: 16px; /* 保持左右内边距一致 */
+        }
     </style>
 </head>
 <body>
@@ -167,21 +174,21 @@
                 <div class="legend-box lv4"></div>
                 <span style="margin-left: 5px;">高正确率</span>
             </div>
-        </section>
+        </section> 1
 
         <section class="entry-section">
             <h3 style="margin-bottom: 15px;">当日成绩: <span id="selectedDateText" style="color: #7b68ee;"></span></h3>
             <div class="entry-grid">
                 <div class="entry-item">
-                    <label for="mathInput">数学 %</label>
+                    <label for="mathInput">数学</label>
                     <input type="number" id="mathInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label for="readingInput">阅读 %</label>
+                    <label for="readingInput">阅读</label>
                     <input type="number" id="readingInput" placeholder="0-100">
                 </div>
                 <div class="entry-item">
-                    <label for="spellingInput">拼写 %</label>
+                    <label for="spellingInput">拼写</label>
                     <input type="number" id="spellingInput" placeholder="0-100">
                 </div>
             </div>
