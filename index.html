@@ -100,6 +100,41 @@
 
     <div id="medalPopup"></div>
 
+    <!-- 新增：个人信息设置弹窗 -->
+    <div id="profileModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 style="text-align: center; margin-bottom: 20px;">个人信息设置</h3>
+            
+            <div class="input-group">
+                <label style="font-size: 12px; color: #8a87b8; margin-bottom: 5px; display: block;">头像设置</label>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img id="modalAvatarPreview" src="" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #eee; background: #f0f0f5;">
+                    <div style="flex: 1;">
+                        <input type="file" id="avatarFileInput" accept="image/*" style="width: 100%; padding: 8px; font-size: 12px; border: 1px solid #eee; border-radius: 8px;">
+                        <div style="font-size: 10px; color: #aaa; margin-top: 4px;">支持 JPG, PNG (建议 2MB 以内)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label style="font-size: 12px; color: #8a87b8; margin-bottom: 5px; display: block;">昵称</label>
+                <input type="text" id="nicknameInput" placeholder="设置昵称">
+            </div>
+            <button id="saveProfileBtn" class="primary-btn">保存基本信息</button>
+
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #f0f0f5;">
+
+            <div class="input-group">
+                <label style="font-size: 12px; color: #8a87b8; margin-bottom: 5px; display: block;">修改密码 (留空不修改)</label>
+                <input type="password" id="oldPasswordInput" placeholder="输入旧密码 (验证身份)">
+                <input type="password" id="newPasswordInput" placeholder="输入新密码">
+            </div>
+            <button id="updatePwdBtn" class="primary-btn" style="background: linear-gradient(135deg, #ff9c6e 0%, #ff7875 100%); margin-top: 10px;">更新密码</button>
+            
+            <button id="closeProfileBtn" class="text-btn" style="width: 100%; margin-top: 15px;">关闭</button>
+        </div>
+    </div>
+
     <div id="authContainer" class="container">
         <div class="auth-box">
             <div class="auth-card">
@@ -115,6 +150,7 @@
                         <input type="password" id="passwordInput" placeholder="密码">
                     </div>
                     <button id="loginBtn" class="primary-btn">立即登录</button>
+                    <button id="forgotPwdBtn" class="text-btn" style="width: 100%; text-align: center; margin-top: 10px;">忘记密码？</button>
                 </div>
 
                 <div id="registerForm" style="display: none;">
@@ -132,7 +168,10 @@
 
     <div id="appContainer" class="container" style="display: none;">
         <div class="status-bar">
-            <span id="loginStatus">👤 用户登录中...</span>
+            <div id="userInfoTrigger" class="user-info-trigger">
+                <img id="currentAvatar" src="" alt="Avatar" class="status-avatar" style="display: none;">
+                <span id="currentNickname" class="status-name">加载中...</span>
+            </div>
             <button id="logoutBtn" class="text-btn">退出登录</button>
         </div>
 

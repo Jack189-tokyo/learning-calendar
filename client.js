@@ -8,6 +8,7 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ===== 2. 全局状态 =====
 let currentYear, currentMonth, selectedDateISO, currentUser;
 let currentSubject = "math";
+let isRecoveryMode = false; // 新增：标记是否处于密码重置模式
 let barChart;
 let mouseX = -1000, mouseY = -1000;
 let currentPage = 1;
@@ -34,7 +35,23 @@ window.addEventListener("DOMContentLoaded", async () => {
     // 核心修复：监听 Auth 状态并在状态变化时重新绑定事件
     sbClient.auth.onAuthStateChange((event, session) => {
         currentUser = session?.user;
-        if (currentUser) {
+        
+        // 检测是否是点击重置密码邮件进来的
+        if (event === 'PASSWORD_RECOVERY') {
+            isRecoveryMode = true;
+            showMainApp();
+            updateUserProfileUI(); // 更新头像和昵称显示
+            // 自动打开弹窗并提示
+            const modal = safeGet("profileModal");
+            if (modal) modal.style.display = "flex";
+            const oldInput = safeGet("oldPasswordInput");
+            if (oldInput) oldInput.style.display = "none"; // 隐藏旧密码框
+            alert("正在进行密码重置，请直接输入新密码并保存");
+        } else if (currentUser) {
+            isRecoveryMode = false;
+            const oldInput = safeGet("oldPasswordInput");
+            if (oldInput) oldInput.style.display = "block"; // 恢复显示
+            updateUserProfileUI();
             showMainApp();
         } else {
             showAuthForm();
@@ -118,6 +135,29 @@ async function handleLogin() {
     if (error && msg) msg.textContent = "❌ " + error.message;
 }
 
+// 新增：处理忘记密码
+async function handleForgotPassword() {
+    const email = safeGet("emailInput")?.value.trim();
+    const msg = safeGet("authMsg");
+    
+    if (!email) {
+        if (msg) msg.textContent = "❌ 请先在上方输入邮箱地址";
+        return;
+    }
+    
+    if (msg) msg.textContent = "⏳ 正在发送重置邮件...";
+    
+    const { error } = await sbClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href // 重置后跳回当前页面
+    });
+
+    if (error) {
+        if (msg) msg.textContent = "❌ " + error.message;
+    } else {
+        if (msg) msg.textContent = "✅ 重置邮件已发送，请查收！";
+    }
+}
+
 async function handleRegister() {
     const email = safeGet("regEmailInput")?.value.trim() || safeGet("authEmail")?.value.trim();
     const password = safeGet("regPasswordInput")?.value || safeGet("authPassword")?.value;
@@ -167,8 +207,6 @@ function toggleAuthMode(mode) {
 // ===== 6. 云端数据同步 =====
 async function syncAllFromCloud() {
     if (!currentUser) return;
-    const statusEl = safeGet("loginStatus");
-    if (statusEl) statusEl.textContent = "⏳ 同步中...";
     try {
         const [recordsRes, wrongsRes, honorsRes] = await Promise.all([
             sbClient.from('learning_records').select('*').eq('user_id', currentUser.id),
@@ -190,7 +228,6 @@ async function syncAllFromCloud() {
             localStorage.setItem("honorWall", JSON.stringify(honorsRes.data.map(h => ({ date: h.date, medal: h.medal }))));
         }
         setSelected(selectedDateISO);
-        if (statusEl) statusEl.textContent = `👤 ${currentUser.email}`;
     } catch (e) { console.error("同步失败:", e); }
 }
 
@@ -377,6 +414,142 @@ async function addMedalToHonorWall(date, medal) {
     renderHonorWall();
 }
 
+// ===== 新增：个人信息管理逻辑 =====
+function updateUserProfileUI() {
+    if (!currentUser) return;
+    const meta = currentUser.user_metadata || {};
+    // 如果没有设置昵称，显示邮箱前缀
+    const displayName = meta.full_name || currentUser.email.split('@')[0];
+    // 如果没有头像，使用 ui-avatars 生成一个基于名字的默认头像
+    const avatarUrl = meta.avatar_url || `https://ui-avatars.com/api/?name=${displayName}&background=7b68ee&color=fff&size=128&length=1&bold=true`;
+
+    const nameEl = safeGet("currentNickname");
+    const imgEl = safeGet("currentAvatar");
+    
+    if (nameEl) nameEl.textContent = displayName;
+    if (imgEl) {
+        imgEl.src = avatarUrl;
+        imgEl.style.display = "block";
+    }
+}
+
+async function handleUpdateProfile() {
+    const nick = safeGet("nicknameInput").value.trim();
+    const fileInput = safeGet("avatarFileInput");
+    const file = fileInput?.files[0];
+    const btn = safeGet("saveProfileBtn");
+    
+    if (btn) btn.textContent = "⏳ 处理中...";
+    
+    let publicAvatarUrl = null;
+
+    // 1. 如果选择了新图片，先上传到 Supabase Storage
+    if (file) {
+        if (btn) btn.textContent = "⏳ 上传图片...";
+        try {
+            const fileExt = file.name.split('.').pop();
+            // 使用 用户ID/时间戳.后缀 避免文件名冲突
+            const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
+
+            const { error: uploadError } = await sbClient.storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            const { data } = sbClient.storage.from('avatars').getPublicUrl(filePath);
+            publicAvatarUrl = data.publicUrl;
+        } catch (error) {
+            console.error("头像上传失败:", error);
+            alert("头像上传失败: " + error.message + "\n请确保已在 Supabase 创建 'avatars' 公开存储桶。");
+            if (btn) btn.textContent = "保存基本信息";
+            return;
+        }
+    }
+    
+    const updates = {};
+    if (nick) updates.full_name = nick;
+    if (publicAvatarUrl) updates.avatar_url = publicAvatarUrl;
+
+    // 如果没有修改任何内容
+    if (Object.keys(updates).length === 0) {
+        if (btn) btn.textContent = "保存基本信息";
+        return;
+    }
+
+    const { data, error } = await sbClient.auth.updateUser({ data: updates });
+    
+    if (error) {
+        alert("更新失败: " + error.message);
+        if (btn) btn.textContent = "保存基本信息";
+    } else {
+        if (btn) btn.textContent = "✅ 保存成功";
+        currentUser = data.user; // 更新本地用户对象
+        updateUserProfileUI();
+        // 清空文件选择
+        if (fileInput) fileInput.value = "";
+        setTimeout(() => {
+            if (btn) btn.textContent = "保存基本信息";
+            safeGet("profileModal").style.display = "none";
+        }, 1000);
+    }
+}
+
+async function handleUpdatePassword() {
+    const oldPwd = safeGet("oldPasswordInput").value;
+    const newPwd = safeGet("newPasswordInput").value;
+    const btn = safeGet("updatePwdBtn");
+    
+    if (!newPwd || newPwd.length < 6) {
+        alert("新密码长度至少需要6位");
+        return;
+    }
+    
+    // 只有在非重置模式下，才强制验证旧密码
+    if (!isRecoveryMode) {
+        if (!oldPwd) {
+            alert("请输入旧密码以验证身份");
+            return;
+        }
+        
+        if (btn) btn.textContent = "⏳ 验证旧密码...";
+
+        // 1. 尝试用旧密码重新登录以验证身份
+        const { error: signInError } = await sbClient.auth.signInWithPassword({
+            email: currentUser.email,
+            password: oldPwd
+        });
+
+        if (signInError) {
+            alert("旧密码错误，验证失败");
+            if (btn) btn.textContent = "更新密码";
+            return;
+        }
+    }
+    
+    // 2. 执行更新
+    if (btn) btn.textContent = "⏳ 更新中...";
+    const { error } = await sbClient.auth.updateUser({ password: newPwd });
+    
+    if (error) {
+        alert("密码更新失败: " + error.message);
+        if (btn) btn.textContent = "更新密码";
+    } else {
+        if (btn) btn.textContent = "✅ 密码已更新";
+        safeGet("oldPasswordInput").value = "";
+        safeGet("newPasswordInput").value = "";
+        
+        // 如果是重置模式，更新成功后恢复正常模式
+        if (isRecoveryMode) {
+            isRecoveryMode = false;
+            alert("密码重置成功！下次请使用新密码登录。");
+            safeGet("profileModal").style.display = "none";
+        }
+        
+        setTimeout(() => { if (btn) btn.textContent = "更新密码"; }, 2000);
+    }
+}
+
 // ===== 10. 初始化辅助函数 =====
 function initCustomSelect() {
     const trigger = safeGet('selectTrigger'), container = safeGet('customOptions');
@@ -427,7 +600,40 @@ function bindEvents() {
     bind("signupBtn", handleRegister);
     bind("submitRegister", handleRegister);
     bind("regBtn", handleRegister);
+    bind("forgotPwdBtn", handleForgotPassword); // 绑定忘记密码按钮
     
     // 退出按钮 (在此处确保 ID 匹配)
     bind("logoutBtn", handleLogout);
+
+    // 新增：个人信息相关事件
+    bind("userInfoTrigger", () => {
+        const modal = safeGet("profileModal");
+        if (modal) {
+            modal.style.display = "flex";
+            // 填充当前值
+            safeGet("nicknameInput").value = currentUser?.user_metadata?.full_name || "";
+            
+            // 设置弹窗内的预览图
+            const currentUrl = currentUser?.user_metadata?.avatar_url;
+            const displayName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || "U";
+            const defaultUrl = `https://ui-avatars.com/api/?name=${displayName}&background=7b68ee&color=fff&size=128&length=1&bold=true`;
+            
+            const preview = safeGet("modalAvatarPreview");
+            if (preview) preview.src = currentUrl || defaultUrl;
+            
+            // 清空文件输入
+            const fileInput = safeGet("avatarFileInput");
+            if (fileInput) {
+                fileInput.value = "";
+                // 绑定选择文件后的即时预览
+                fileInput.onchange = (e) => {
+                    const f = e.target.files[0];
+                    if (f && preview) preview.src = URL.createObjectURL(f);
+                };
+            }
+        }
+    });
+    bind("closeProfileBtn", () => safeGet("profileModal").style.display = "none");
+    bind("saveProfileBtn", handleUpdateProfile);
+    bind("updatePwdBtn", handleUpdatePassword);
 }
