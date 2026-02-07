@@ -37,7 +37,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         currentUser = session?.user;
         
         // 检测是否是点击重置密码邮件进来的
-        if (event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY' || isRecoveryMode) {
             isRecoveryMode = true;
             showMainApp();
             updateUserProfileUI(); // 更新头像和昵称显示
@@ -135,26 +135,78 @@ async function handleLogin() {
     if (error && msg) msg.textContent = "❌ " + error.message;
 }
 
-// 新增：处理忘记密码
-async function handleForgotPassword() {
-    const email = safeGet("emailInput")?.value.trim();
+// 修改：处理忘记密码 - 切换到 OTP 登录界面
+function handleForgotPassword() {
+    safeGet("loginForm").style.display = "none";
+    safeGet("otpLoginForm").style.display = "block";
+    safeGet("authMsg").textContent = "";
+    // 预填邮箱
+    const loginEmail = safeGet("emailInput")?.value.trim();
+    if (loginEmail) safeGet("otpEmailInput").value = loginEmail;
+}
+
+function handleBackToLogin() {
+    safeGet("otpLoginForm").style.display = "none";
+    safeGet("loginForm").style.display = "block";
+    safeGet("authMsg").textContent = "";
+}
+
+async function handleSendOtp() {
+    const email = safeGet("otpEmailInput")?.value.trim();
     const msg = safeGet("authMsg");
+    const btn = safeGet("sendOtpBtn");
+
+    if (!email) { if (msg) msg.textContent = "❌ 请输入邮箱"; return; }
     
-    if (!email) {
-        if (msg) msg.textContent = "❌ 请先在上方输入邮箱地址";
-        return;
-    }
-    
-    if (msg) msg.textContent = "⏳ 正在发送重置邮件...";
-    
-    const { error } = await sbClient.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href // 重置后跳回当前页面
-    });
+    if (btn) { btn.disabled = true; btn.textContent = "发送中..."; }
+    if (msg) msg.textContent = "⏳ 正在发送验证码...";
+
+    // 发送 OTP (Magic Link 也会作为验证码发送)
+    const { error } = await sbClient.auth.signInWithOtp({ email });
 
     if (error) {
+        if (btn) { btn.disabled = false; btn.textContent = "获取验证码"; }
         if (msg) msg.textContent = "❌ " + error.message;
     } else {
-        if (msg) msg.textContent = "✅ 重置邮件已发送，请查收！";
+        if (msg) msg.textContent = "✅ 验证码已发送，请查收邮件";
+        safeGet("otpCodeInput")?.focus();
+        if (btn) {
+            let count = 60;
+            btn.textContent = `${count}s`;
+            const timer = setInterval(() => {
+                count--;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    btn.textContent = "获取验证码";
+                } else {
+                    btn.textContent = `${count}s`;
+                }
+            }, 1000);
+        }
+    }
+}
+
+async function handleOtpLogin() {
+    const email = safeGet("otpEmailInput")?.value.trim();
+    const token = safeGet("otpCodeInput")?.value.trim();
+    const msg = safeGet("authMsg");
+
+    if (!email || !token) { if (msg) msg.textContent = "❌ 请输入邮箱和验证码"; return; }
+    if (msg) msg.textContent = "⏳ 正在验证...";
+
+    // 验证 OTP 并登录
+    const { data, error } = await sbClient.auth.verifyOtp({ email, token, type: 'email' });
+
+    if (error) { if (msg) msg.textContent = "❌ " + error.message; }
+    else {
+        isRecoveryMode = true; // 标记为恢复模式
+        // 手动触发弹窗，确保在 Auth 状态变化前或后都能正确打开
+        const modal = safeGet("profileModal");
+        if (modal) modal.style.display = "flex";
+        const oldInput = safeGet("oldPasswordInput");
+        if (oldInput) oldInput.style.display = "none";
+        alert("验证成功！请设置新密码");
     }
 }
 
@@ -498,10 +550,16 @@ async function handleUpdateProfile() {
 async function handleUpdatePassword() {
     const oldPwd = safeGet("oldPasswordInput").value;
     const newPwd = safeGet("newPasswordInput").value;
+    const confirmPwd = safeGet("confirmPasswordInput").value;
     const btn = safeGet("updatePwdBtn");
     
     if (!newPwd || newPwd.length < 6) {
         alert("新密码长度至少需要6位");
+        return;
+    }
+
+    if (newPwd !== confirmPwd) {
+        alert("两次输入的密码不一致，请重新输入");
         return;
     }
     
@@ -538,6 +596,7 @@ async function handleUpdatePassword() {
         if (btn) btn.textContent = "✅ 密码已更新";
         safeGet("oldPasswordInput").value = "";
         safeGet("newPasswordInput").value = "";
+        safeGet("confirmPasswordInput").value = "";
         
         // 如果是重置模式，更新成功后恢复正常模式
         if (isRecoveryMode) {
@@ -601,6 +660,17 @@ function bindEvents() {
     bind("submitRegister", handleRegister);
     bind("regBtn", handleRegister);
     bind("forgotPwdBtn", handleForgotPassword); // 绑定忘记密码按钮
+    bind("backToLoginBtn", handleBackToLogin);
+    bind("sendOtpBtn", handleSendOtp);
+    bind("otpLoginBtn", handleOtpLogin);
+
+    // 优化验证码输入：限制数字、支持粘贴过滤
+    const otpInput = safeGet("otpCodeInput");
+    if (otpInput) {
+        otpInput.oninput = (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+        };
+    }
     
     // 退出按钮 (在此处确保 ID 匹配)
     bind("logoutBtn", handleLogout);
