@@ -17,6 +17,13 @@ const ITEMS_PER_PAGE = 6;
 // ===== 3. 初始化入口 =====
 window.addEventListener("DOMContentLoaded", async () => {
     console.log("应用启动中...");
+
+    // 新增：检测 Magic Link 登录
+    // 当用户点击邮件中的链接跳转回应用时，URL Hash 中会包含 type=magiclink
+    if (window.location.hash && window.location.hash.includes('type=magiclink')) {
+        isRecoveryMode = true;
+    }
+
     initTime();
 
     // 监听全局交互位置
@@ -159,17 +166,16 @@ async function handleSendOtp() {
     if (!email) { if (msg) msg.textContent = "❌ 请输入邮箱"; return; }
     
     if (btn) { btn.disabled = true; btn.textContent = "发送中..."; }
-    if (msg) msg.textContent = "⏳ 正在发送验证码...";
+    if (msg) msg.textContent = "⏳ 正在发送登录链接...";
 
     // 发送 OTP (Magic Link 也会作为验证码发送)
     const { error } = await sbClient.auth.signInWithOtp({ email });
 
     if (error) {
-        if (btn) { btn.disabled = false; btn.textContent = "获取验证码"; }
+        if (btn) { btn.disabled = false; btn.textContent = "获取登录链接"; }
         if (msg) msg.textContent = "❌ " + error.message;
     } else {
-        if (msg) msg.textContent = "✅ 验证码已发送，请查收邮件";
-        safeGet("otpCodeInput")?.focus();
+        if (msg) msg.textContent = "✅ 登录链接已发送，请查收邮件";
         if (btn) {
             let count = 60;
             btn.textContent = `${count}s`;
@@ -178,35 +184,12 @@ async function handleSendOtp() {
                 if (count <= 0) {
                     clearInterval(timer);
                     btn.disabled = false;
-                    btn.textContent = "获取验证码";
+                    btn.textContent = "获取登录链接";
                 } else {
                     btn.textContent = `${count}s`;
                 }
             }, 1000);
         }
-    }
-}
-
-async function handleOtpLogin() {
-    const email = safeGet("otpEmailInput")?.value.trim();
-    const token = safeGet("otpCodeInput")?.value.trim();
-    const msg = safeGet("authMsg");
-
-    if (!email || !token) { if (msg) msg.textContent = "❌ 请输入邮箱和验证码"; return; }
-    if (msg) msg.textContent = "⏳ 正在验证...";
-
-    // 验证 OTP 并登录
-    const { data, error } = await sbClient.auth.verifyOtp({ email, token, type: 'email' });
-
-    if (error) { if (msg) msg.textContent = "❌ " + error.message; }
-    else {
-        isRecoveryMode = true; // 标记为恢复模式
-        // 手动触发弹窗，确保在 Auth 状态变化前或后都能正确打开
-        const modal = safeGet("profileModal");
-        if (modal) modal.style.display = "flex";
-        const oldInput = safeGet("oldPasswordInput");
-        if (oldInput) oldInput.style.display = "none";
-        alert("验证成功！请设置新密码");
     }
 }
 
@@ -662,15 +645,6 @@ function bindEvents() {
     bind("forgotPwdBtn", handleForgotPassword); // 绑定忘记密码按钮
     bind("backToLoginBtn", handleBackToLogin);
     bind("sendOtpBtn", handleSendOtp);
-    bind("otpLoginBtn", handleOtpLogin);
-
-    // 优化验证码输入：限制数字、支持粘贴过滤
-    const otpInput = safeGet("otpCodeInput");
-    if (otpInput) {
-        otpInput.oninput = (e) => {
-            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
-        };
-    }
     
     // 退出按钮 (在此处确保 ID 匹配)
     bind("logoutBtn", handleLogout);
