@@ -1,4 +1,4 @@
-﻿﻿// ===== 1. Supabase 配置 =====
+// ===== 1. Supabase 配置 =====
 const SUPABASE_URL = 'https://jzvpilyvupnichmdkizu.supabase.co';
 // 注意：这里使用的是 anon (public) key，是可以暴露在前端的。
 // 安全性依赖于 Supabase 数据库中必须开启 RLS (Row Level Security) 策略！
@@ -51,13 +51,10 @@ window.addEventListener("DOMContentLoaded", async () => {
             // 自动打开弹窗并提示
             const modal = safeGet("profileModal");
             if (modal) modal.style.display = "flex";
-            const oldInput = safeGet("oldPasswordInput");
-            if (oldInput) oldInput.style.display = "none"; // 隐藏旧密码框
-            alert("正在进行密码重置，请直接输入新密码并保存");
+            setRecoveryUI(true);
         } else if (currentUser) {
             isRecoveryMode = false;
-            const oldInput = safeGet("oldPasswordInput");
-            if (oldInput) oldInput.style.display = "block"; // 恢复显示
+            setRecoveryUI(false);
             updateUserProfileUI();
             showMainApp();
         } else {
@@ -117,6 +114,28 @@ function initMathBackground() {
 
 // ===== 5. 核心逻辑与数据处理 =====
 function safeGet(id) { return document.getElementById(id); }
+
+function setRecoveryUI(enabled) {
+    const hint = safeGet("recoveryHint");
+    const oldInput = safeGet("oldPasswordInput");
+    const personalSection = safeGet("profileModalPersonalSection");
+    const titleEl = safeGet("profileModalTitle");
+
+    if (hint) hint.style.display = enabled ? "block" : "none";
+    if (oldInput) oldInput.style.display = enabled ? "none" : "block";
+    if (personalSection) personalSection.style.display = enabled ? "none" : "block";
+    if (titleEl) titleEl.textContent = enabled ? "重置密码" : "个人信息设置";
+
+    if (enabled) {
+        const newPwd = safeGet("newPasswordInput");
+        if (newPwd) {
+            setTimeout(() => {
+                try { newPwd.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
+                try { newPwd.focus(); } catch (e) {}
+            }, 50);
+        }
+    }
+}
 
 function initTime() {
     const today = new Date();
@@ -654,6 +673,8 @@ function bindEvents() {
         const modal = safeGet("profileModal");
         if (modal) {
             modal.style.display = "flex";
+            // 按当前模式展示/隐藏“密码重置”提示
+            setRecoveryUI(!!isRecoveryMode);
             // 填充当前值
             safeGet("nicknameInput").value = currentUser?.user_metadata?.full_name || "";
             

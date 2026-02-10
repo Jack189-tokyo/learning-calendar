@@ -240,6 +240,29 @@ section {
     border: 2px solid var(--border-color);
 }
 
+/* ===== 弹窗内提示条（用于密码重置引导） ===== */
+.inline-notice {
+    border-radius: 18px;
+    padding: 14px 14px;
+    margin: 0 0 14px 0;
+    background: linear-gradient(135deg, rgba(123, 104, 238, 0.12) 0%, rgba(255, 156, 110, 0.10) 100%);
+    border: 1px solid rgba(123, 104, 238, 0.25);
+    color: var(--text-main);
+    text-align: center;
+}
+
+.inline-notice-title {
+    font-weight: 800;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.inline-notice-desc {
+    font-size: 12px;
+    color: var(--text-sub);
+    line-height: 1.4;
+}
+
 /* 专门针对退出登录按钮的精准修正 */
 .status-bar button {
     background: #fff0f0;
