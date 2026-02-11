@@ -592,7 +592,10 @@ async function handleUpdatePassword() {
     const { error } = await sbClient.auth.updateUser({ password: newPwd });
     
     if (error) {
-        alert("密码更新失败: " + error.message);
+        const msg = error.message && error.message.toLowerCase().includes("different from the old password")
+            ? "新密码不能与当前密码相同，请换一个不同的密码。"
+            : "密码更新失败: " + error.message;
+        alert(msg);
         if (btn) btn.textContent = "更新密码";
     } else {
         if (btn) btn.textContent = "✅ 密码已更新";
