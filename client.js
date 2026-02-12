@@ -1,4 +1,4 @@
-// ===== 1. Supabase 配置 =====
+﻿// ===== 1. Supabase 配置 =====
 const SUPABASE_URL = 'https://jzvpilyvupnichmdkizu.supabase.co';
 // 注意：这里使用的是 anon (public) key，是可以暴露在前端的。
 // 安全性依赖于 Supabase 数据库中必须开启 RLS (Row Level Security) 策略！
@@ -253,6 +253,7 @@ function showAuthForm() {
 function toggleAuthMode(mode) {
     if (safeGet("loginForm")) safeGet("loginForm").style.display = mode === 'login' ? 'block' : 'none';
     if (safeGet("registerForm")) safeGet("registerForm").style.display = mode === 'reg' ? 'block' : 'none';
+    if (safeGet("otpLoginForm")) safeGet("otpLoginForm").style.display = 'none';
     safeGet("showLogin")?.classList.toggle("active", mode === 'login');
     safeGet("showRegister")?.classList.toggle("active", mode === 'reg');
     if (safeGet("authMsg")) safeGet("authMsg").textContent = "";
