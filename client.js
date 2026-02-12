@@ -672,6 +672,25 @@ function bindEvents() {
     // 退出按钮 (在此处确保 ID 匹配)
     bind("logoutBtn", handleLogout);
 
+    // 优化头像上传交互：隐藏原生文件框，使用自定义按钮
+    const fileInput = safeGet("avatarFileInput");
+    if (fileInput) {
+        fileInput.style.display = "none";
+        let customBtn = safeGet("customAvatarUploadBtn");
+        if (!customBtn) {
+            customBtn = document.createElement("button");
+            customBtn.id = "customAvatarUploadBtn";
+            customBtn.type = "button";
+            customBtn.textContent = "从本地上传头像";
+            customBtn.style.cssText = "display: block; margin: 10px 0; padding: 6px 12px; background-color: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 6px; cursor: pointer; font-size: 14px;";
+            fileInput.parentNode.insertBefore(customBtn, fileInput);
+            customBtn.onclick = (e) => {
+                e.preventDefault();
+                fileInput.click();
+            };
+        }
+    }
+
     // 新增：个人信息相关事件
     bind("userInfoTrigger", () => {
         const modal = safeGet("profileModal");
