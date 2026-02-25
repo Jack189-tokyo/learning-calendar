@@ -675,7 +675,8 @@ function bindEvents() {
     // 优化头像上传交互：隐藏原生文件框，使用自定义按钮
     const fileInput = safeGet("avatarFileInput");
     if (fileInput) {
-        fileInput.style.display = "none";
+        // 移动端兼容性修复：不要使用 display: none，否则部分机型无法唤起相册
+        fileInput.style.cssText = "position: absolute; opacity: 0; width: 1px; height: 1px; overflow: hidden; z-index: -1;";
         let customBtn = safeGet("customAvatarUploadBtn");
         if (!customBtn) {
             customBtn = document.createElement("button");
